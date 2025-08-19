@@ -14,7 +14,7 @@ export const ALGORITHM_INFO = {
   },
   'RSA-PKCS1': {
     name: 'RSA-PKCS1',
-    description: 'PKCS#1 v1.5 패딩 (보안상 권장하지 않음)',
+    description: 'PKCS#1 v1.5 패딩 (보안 위험 있음)',
     status: 'deprecated',
   },
 } as const;

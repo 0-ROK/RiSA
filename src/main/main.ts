@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import Store from 'electron-store';
 import NodeRSA from 'node-rsa';
+import * as forge from 'node-forge';
 import * as fs from 'fs';
 import { SavedKey, RSAKeyPair, EncryptionResult } from '../shared/types';
 import { IPC_CHANNELS } from '../shared/constants';
@@ -99,31 +100,47 @@ ipcMain.handle(IPC_CHANNELS.GENERATE_RSA_KEYS, (_, keySize: number): RSAKeyPair 
   }
 });
 
-// 알고리즘 매핑 함수 - Node.js 보안 제약으로 인해 모든 알고리즘에서 OAEP 사용
-const getEncryptionScheme = (algorithm: string): 'pkcs1_oaep' => {
-  // Node.js v20+에서 RSA_PKCS1_PADDING이 CVE-2023-46809로 인해 비활성화됨
-  // 사용자가 RSA-PKCS1을 선택하더라도 보안상 OAEP 패딩을 사용
+// 하이브리드 암호화 함수 - RSA-OAEP는 node-rsa, RSA-PKCS1은 node-forge 사용
+const encryptWithAlgorithm = (text: string, publicKeyPem: string, algorithm: string): string => {
   if (algorithm === 'RSA-PKCS1') {
-    console.warn('Note: RSA-PKCS1 requested but using OAEP for security (Node.js restriction)');
+    // node-forge를 사용하여 PKCS#1 v1.5 패딩으로 암호화
+    const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+    const encrypted = publicKey.encrypt(text); // 기본이 PKCS#1 v1.5
+    return forge.util.encode64(encrypted);
+  } else {
+    // node-rsa를 사용하여 OAEP 패딩으로 암호화
+    const key = new NodeRSA(publicKeyPem);
+    key.setOptions({ encryptionScheme: 'pkcs1_oaep' });
+    return key.encrypt(text, 'base64');
   }
-  return 'pkcs1_oaep';
+};
+
+const decryptWithAlgorithm = (encryptedText: string, privateKeyPem: string, algorithm: string): string => {
+  if (algorithm === 'RSA-PKCS1') {
+    // node-forge를 사용하여 PKCS#1 v1.5 패딩으로 복호화
+    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+    const encrypted = forge.util.decode64(encryptedText);
+    return privateKey.decrypt(encrypted); // 기본이 PKCS#1 v1.5
+  } else {
+    // node-rsa를 사용하여 OAEP 패딩으로 복호화
+    const key = new NodeRSA(privateKeyPem);
+    key.setOptions({ encryptionScheme: 'pkcs1_oaep' });
+    return key.decrypt(encryptedText, 'utf8');
+  }
 };
 
 // Encryption/Decryption
 ipcMain.handle(IPC_CHANNELS.ENCRYPT_TEXT, (_, text: string, publicKey: string, algorithm?: string): EncryptionResult => {
   try {
     const selectedAlgorithm = algorithm || 'RSA-OAEP';
-    const encryptionScheme = getEncryptionScheme(selectedAlgorithm);
     
-    // 공개키로 NodeRSA 인스턴스 생성
+    // 하이브리드 암호화 함수 사용
+    const encrypted = encryptWithAlgorithm(text, publicKey, selectedAlgorithm);
+    
+    // 키 크기 계산을 위해 node-rsa 사용 (호환성)
     const key = new NodeRSA(publicKey);
     
-    // 선택된 알고리즘에 따라 패딩 스킴 설정
-    key.setOptions({ encryptionScheme });
-    
-    const encrypted = key.encrypt(text, 'base64');
-    
-    console.log(`암호화 완료 - 알고리즘: ${selectedAlgorithm}, 패딩 스킴: ${encryptionScheme}`);
+    console.log(`암호화 완료 - 알고리즘: ${selectedAlgorithm}, 백엔드: ${selectedAlgorithm === 'RSA-PKCS1' ? 'node-forge' : 'node-rsa'}`);
     
     return {
       data: encrypted,
@@ -140,17 +157,11 @@ ipcMain.handle(IPC_CHANNELS.ENCRYPT_TEXT, (_, text: string, publicKey: string, a
 ipcMain.handle(IPC_CHANNELS.DECRYPT_TEXT, (_, encryptedText: string, privateKey: string, algorithm?: string): string => {
   try {
     const selectedAlgorithm = algorithm || 'RSA-OAEP';
-    const encryptionScheme = getEncryptionScheme(selectedAlgorithm);
     
-    // 개인키로 NodeRSA 인스턴스 생성
-    const key = new NodeRSA(privateKey);
+    // 하이브리드 복호화 함수 사용
+    const decrypted = decryptWithAlgorithm(encryptedText, privateKey, selectedAlgorithm);
     
-    // 선택된 알고리즘에 따라 패딩 스킴 설정
-    key.setOptions({ encryptionScheme });
-    
-    const decrypted = key.decrypt(encryptedText, 'utf8');
-    
-    console.log(`복호화 완료 - 알고리즘: ${selectedAlgorithm}, 패딩 스킴: ${encryptionScheme}`);
+    console.log(`복호화 완료 - 알고리즘: ${selectedAlgorithm}, 백엔드: ${selectedAlgorithm === 'RSA-PKCS1' ? 'node-forge' : 'node-rsa'}`);
     
     return decrypted;
   } catch (error) {

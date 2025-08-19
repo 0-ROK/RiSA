@@ -52,13 +52,13 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
         </Select.Option>
         <Select.Option 
           value="RSA-PKCS1"
-          label={`${ALGORITHM_INFO['RSA-PKCS1'].name} (보안 경고)`}
+          label={`${ALGORITHM_INFO['RSA-PKCS1'].name} (레거시)`}
         >
           <div>
             <div style={{ fontWeight: 'bold' }}>{ALGORITHM_INFO['RSA-PKCS1'].name}</div>
             <div style={{ 
               fontSize: '11px', 
-              color: '#ff7875',
+              color: '#faad14',
               marginTop: '2px'
             }}>
               {ALGORITHM_INFO['RSA-PKCS1'].description}
