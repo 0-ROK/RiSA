@@ -76,6 +76,12 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: pnpm run package:linux
 
+      - name: List built files (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "=== Built files for Linux ==="
+          find . -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec ls -la {} \;
+
       - name: Package application (Windows)
         if: matrix.os == 'windows-latest'
         env:
@@ -83,6 +89,13 @@ jobs:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: pnpm run package:win
+
+      - name: List built files (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "=== Built files for Windows ==="
+          Get-ChildItem -Recurse -Include "*.exe","*.msi" | ForEach-Object { Write-Host $_.FullName "; Size:" $_.Length }
+        shell: powershell
 
       - name: Package application (macOS)
         if: matrix.os == 'macos-latest'
@@ -98,18 +111,24 @@ jobs:
           fi
           pnpm run package:mac
 
+      - name: List built files (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "=== Built files for macOS ==="
+          find . -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.app" \) -exec ls -la {} \;
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-artifacts
           path: |
-            release/*.exe
-            release/*.msi
-            release/*.dmg
-            release/*.zip
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
+            **/*.exe
+            **/*.msi
+            **/*.dmg
+            **/*.zip
+            **/*.AppImage
+            **/*.deb
+            **/*.rpm
           retention-days: 5
 
   release:
@@ -132,16 +151,21 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Downloaded artifacts ==="
+          find . -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec ls -la {} \;
+          echo "=== All files in current directory ==="
+          ls -la
+
       - name: Get release files info
         id: get_files
         run: |
           echo "files<<EOF" >> $GITHUB_OUTPUT
-          find . -name "*-artifacts" -type d | while read dir; do
-            find "$dir" -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) | while read file; do
-              filename=$(basename "$file")
-              size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
-              echo "{\"name\":\"$filename\",\"size\":$size}"
-            done
+          find . -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) | while read file; do
+            filename=$(basename "$file")
+            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
+            echo "{\"name\":\"$filename\",\"size\":$size}"
           done | jq -s . >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
@@ -153,7 +177,13 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            *-artifacts/*
+            **/*.exe
+            **/*.msi
+            **/*.dmg
+            **/*.zip
+            **/*.AppImage
+            **/*.deb
+            **/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
