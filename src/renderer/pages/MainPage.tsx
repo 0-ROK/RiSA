@@ -118,14 +118,27 @@ const MainPage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '24px', minHeight: '100%' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <Title level={2}>RSA 암호화/복호화</Title>
+    <div style={{ 
+      padding: '24px', 
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      <div style={{ 
+        maxWidth: 1200, 
+        margin: '0 auto',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%'
+      }}>
+        <Title level={2} style={{ marginBottom: '16px', flexShrink: 0 }}>RSA 암호화/복호화</Title>
         
         {/* 키 선택 및 알고리즘 선택 섹션 */}
-        <Card style={{ marginBottom: 24 }}>
+        <Card style={{ marginBottom: 16, flexShrink: 0 }}>
           <Row gutter={16} align="middle">
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Text strong>
                   <KeyOutlined style={{ marginRight: 8 }} />
@@ -148,7 +161,7 @@ const MainPage: React.FC = () => {
               </Space>
             </Col>
             
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Text strong>암호화 알고리즘</Text>
                 <Select
@@ -165,7 +178,7 @@ const MainPage: React.FC = () => {
               </Space>
             </Col>
             
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               {selectedKey && (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Text strong>선택된 키 정보</Text>
@@ -195,159 +208,225 @@ const MainPage: React.FC = () => {
           )}
         </Card>
         
-        <Tabs defaultActiveKey="encrypt" size="large">
-          <TabPane 
-            tab={
-              <span>
-                <LockOutlined />
-                암호화
-              </span>
-            } 
-            key="encrypt"
-          >
-            <Row gutter={24}>
-              <Col span={12}>
-                <Card title="입력" style={{ height: '100%' }}>
-                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                    <div>
-                      <Text strong>암호화할 텍스트</Text>
-                      <TextArea
-                        value={encryptText}
-                        onChange={(e) => setEncryptText(e.target.value)}
-                        placeholder="암호화할 텍스트를 입력하세요..."
-                        rows={15}
-                        style={{ marginTop: 8 }}
-                      />
-                    </div>
-                    
-                    <Space>
-                      <Button 
-                        type="primary" 
-                        icon={<LockOutlined />}
-                        loading={loading}
-                        onClick={handleEncrypt}
-                        disabled={!selectedKey || !encryptText.trim()}
-                      >
-                        암호화
-                      </Button>
-                      <Button 
-                        icon={<ClearOutlined />}
-                        onClick={() => handleClear('encrypt')}
-                      >
-                        초기화
-                      </Button>
-                    </Space>
-                  </Space>
-                </Card>
-              </Col>
-              
-              <Col span={12}>
-                <Card title="결과" style={{ height: '100%' }}>
-                  <div>
-                    <Text strong>암호화된 텍스트</Text>
-                    <TextArea
-                      value={encryptedResult}
-                      readOnly
-                      rows={17}
-                      style={{ 
-                        marginTop: 8, 
-                        fontFamily: 'monospace',
-                        backgroundColor: '#f5f5f5'
-                      }}
-                    />
-                    {encryptedResult && (
-                      <Button 
-                        type="link" 
-                        icon={<CopyOutlined />}
-                        onClick={() => handleCopy(encryptedResult)}
-                        style={{ marginTop: 8 }}
-                      >
-                        복사
-                      </Button>
-                    )}
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <Tabs 
+            defaultActiveKey="encrypt" 
+            size="large"
+            style={{ height: '100%' }}
+            items={[
+              {
+                key: 'encrypt',
+                label: (
+                  <span>
+                    <LockOutlined />
+                    암호화
+                  </span>
+                ),
+                children: (
+                  <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
+                    <Row gutter={24} style={{ height: '100%' }}>
+                      <Col span={12} style={{ height: '100%' }}>
+                        <Card 
+                          title="입력" 
+                          style={{ 
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                          bodyStyle={{ 
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '16px'
+                          }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <Text strong style={{ marginBottom: 8 }}>암호화할 텍스트</Text>
+                            <TextArea
+                              value={encryptText}
+                              onChange={(e) => setEncryptText(e.target.value)}
+                              placeholder="암호화할 텍스트를 입력하세요..."
+                              style={{ 
+                                flex: 1,
+                                resize: 'none',
+                                minHeight: 'calc(100vh - 400px)'
+                              }}
+                            />
+                          </div>
+                          
+                          <Space style={{ marginTop: 16, flexShrink: 0 }}>
+                            <Button 
+                              type="primary" 
+                              icon={<LockOutlined />}
+                              loading={loading}
+                              onClick={handleEncrypt}
+                              disabled={!selectedKey || !encryptText.trim()}
+                            >
+                              암호화
+                            </Button>
+                            <Button 
+                              icon={<ClearOutlined />}
+                              onClick={() => handleClear('encrypt')}
+                            >
+                              초기화
+                            </Button>
+                          </Space>
+                        </Card>
+                      </Col>
+                      
+                      <Col span={12} style={{ height: '100%' }}>
+                        <Card 
+                          title="결과" 
+                          style={{ 
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                          bodyStyle={{ 
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '16px'
+                          }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <Text strong style={{ marginBottom: 8 }}>암호화된 텍스트</Text>
+                            <TextArea
+                              value={encryptedResult}
+                              readOnly
+                              style={{ 
+                                flex: 1,
+                                fontFamily: 'monospace',
+                                backgroundColor: '#f5f5f5',
+                                resize: 'none',
+                                minHeight: 'calc(100vh - 400px)'
+                              }}
+                            />
+                            {encryptedResult && (
+                              <Button 
+                                type="link" 
+                                icon={<CopyOutlined />}
+                                onClick={() => handleCopy(encryptedResult)}
+                                style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                              >
+                                복사
+                              </Button>
+                            )}
+                          </div>
+                        </Card>
+                      </Col>
+                    </Row>
                   </div>
-                </Card>
-              </Col>
-            </Row>
-          </TabPane>
-          
-          <TabPane 
-            tab={
-              <span>
-                <UnlockOutlined />
-                복호화
-              </span>
-            } 
-            key="decrypt"
-          >
-            <Row gutter={24}>
-              <Col span={12}>
-                <Card title="입력" style={{ height: '100%' }}>
-                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                    <div>
-                      <Text strong>복호화할 텍스트</Text>
-                      <TextArea
-                        value={decryptText}
-                        onChange={(e) => setDecryptText(e.target.value)}
-                        placeholder="복호화할 암호화된 텍스트를 입력하세요..."
-                        rows={15}
-                        style={{ 
-                          marginTop: 8,
-                          fontFamily: 'monospace'
-                        }}
-                      />
-                    </div>
-                    
-                    <Space>
-                      <Button 
-                        type="primary" 
-                        icon={<UnlockOutlined />}
-                        loading={loading}
-                        onClick={handleDecrypt}
-                        disabled={!selectedKey || !decryptText.trim()}
-                      >
-                        복호화
-                      </Button>
-                      <Button 
-                        icon={<ClearOutlined />}
-                        onClick={() => handleClear('decrypt')}
-                      >
-                        초기화
-                      </Button>
-                    </Space>
-                  </Space>
-                </Card>
-              </Col>
-              
-              <Col span={12}>
-                <Card title="결과" style={{ height: '100%' }}>
-                  <div>
-                    <Text strong>복호화된 텍스트</Text>
-                    <TextArea
-                      value={decryptedResult}
-                      readOnly
-                      rows={17}
-                      style={{ 
-                        marginTop: 8,
-                        backgroundColor: '#f5f5f5'
-                      }}
-                    />
-                    {decryptedResult && (
-                      <Button 
-                        type="link" 
-                        icon={<CopyOutlined />}
-                        onClick={() => handleCopy(decryptedResult)}
-                        style={{ marginTop: 8 }}
-                      >
-                        복사
-                      </Button>
-                    )}
+                )
+              },
+              {
+                key: 'decrypt',
+                label: (
+                  <span>
+                    <UnlockOutlined />
+                    복호화
+                  </span>
+                ),
+                children: (
+                  <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
+                    <Row gutter={24} style={{ height: '100%' }}>
+                      <Col span={12} style={{ height: '100%' }}>
+                        <Card 
+                          title="입력" 
+                          style={{ 
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                          bodyStyle={{ 
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '16px'
+                          }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <Text strong style={{ marginBottom: 8 }}>복호화할 텍스트</Text>
+                            <TextArea
+                              value={decryptText}
+                              onChange={(e) => setDecryptText(e.target.value)}
+                              placeholder="복호화할 암호화된 텍스트를 입력하세요..."
+                              style={{ 
+                                flex: 1,
+                                fontFamily: 'monospace',
+                                resize: 'none',
+                                minHeight: 'calc(100vh - 400px)'
+                              }}
+                            />
+                          </div>
+                          
+                          <Space style={{ marginTop: 16, flexShrink: 0 }}>
+                            <Button 
+                              type="primary" 
+                              icon={<UnlockOutlined />}
+                              loading={loading}
+                              onClick={handleDecrypt}
+                              disabled={!selectedKey || !decryptText.trim()}
+                            >
+                              복호화
+                            </Button>
+                            <Button 
+                              icon={<ClearOutlined />}
+                              onClick={() => handleClear('decrypt')}
+                            >
+                              초기화
+                            </Button>
+                          </Space>
+                        </Card>
+                      </Col>
+                      
+                      <Col span={12} style={{ height: '100%' }}>
+                        <Card 
+                          title="결과" 
+                          style={{ 
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                          bodyStyle={{ 
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '16px'
+                          }}
+                        >
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <Text strong style={{ marginBottom: 8 }}>복호화된 텍스트</Text>
+                            <TextArea
+                              value={decryptedResult}
+                              readOnly
+                              style={{ 
+                                flex: 1,
+                                backgroundColor: '#f5f5f5',
+                                resize: 'none',
+                                minHeight: 'calc(100vh - 400px)'
+                              }}
+                            />
+                            {decryptedResult && (
+                              <Button 
+                                type="link" 
+                                icon={<CopyOutlined />}
+                                onClick={() => handleCopy(decryptedResult)}
+                                style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                              >
+                                복사
+                              </Button>
+                            )}
+                          </div>
+                        </Card>
+                      </Col>
+                    </Row>
                   </div>
-                </Card>
-              </Col>
-            </Row>
-          </TabPane>
-        </Tabs>
+                )
+              }
+            ]}
+          />
+        </div>
       </div>
     </div>
   );
