@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/icons/RiSA.png" alt="RiSA Logo" width="120" height="120">
   
-  **Postman 스타일의 직관적인 RSA 암호화 데스크톱 애플리케이션**
+  **간단하고 직관적인 RSA 암호화 데스크톱 애플리케이션**
   
   [![GitHub release](https://img.shields.io/github/v/release/0-ROK/RiSA)](https://github.com/0-ROK/RiSA/releases)
   [![GitHub downloads](https://img.shields.io/github/downloads/0-ROK/RiSA/total)](https://github.com/0-ROK/RiSA/releases)
@@ -37,7 +37,7 @@
 - 안전한 키 생성 및 관리
 
 ### 🎨 **직관적인 사용자 인터페이스**
-- Postman 스타일의 깔끔한 디자인
+- 깔끔하고 현대적인 디자인
 - 사이드바 네비게이션으로 쉬운 접근
 - 실시간 오류 검증 및 사용자 피드백
 

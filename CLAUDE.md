@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RiSA is an Electron-based desktop application for RSA encryption and decryption with a Postman-style GUI interface. The application provides text encryption/decryption capabilities and includes a comprehensive settings management system.
+RiSA is an Electron-based desktop application for RSA encryption and decryption with a clean and intuitive GUI interface. The application provides text encryption/decryption capabilities and includes a comprehensive settings management system.
 
 ## Architecture
 
@@ -79,7 +79,7 @@ All communication between main and renderer processes goes through predefined IP
 
 ### UI Framework
 Uses Ant Design components with:
-- Sidebar navigation (Postman-style)
+- Clean sidebar navigation
 - Tabbed interface for encrypt/decrypt operations
 - Theme support (light/dark mode)
 - React Router for page navigation

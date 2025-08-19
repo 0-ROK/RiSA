@@ -272,6 +272,21 @@ jobs:
                       font-weight: 500;
                   }
                   
+                  .screenshot {
+                      padding: 3rem 0;
+                      background: white;
+                  }
+                  .screenshot-container {
+                      text-align: center;
+                  }
+                  .app-screenshot {
+                      max-width: 100%;
+                      height: auto;
+                      border-radius: 12px;
+                      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                      border: 1px solid #f0f0f0;
+                  }
+                  
                   .downloads {
                       background: white;
                       margin: 2rem 0;
@@ -396,7 +411,15 @@ jobs:
                   <div class="container">
                       <div class="version-badge">최신 버전: ${{ steps.get_release.outputs.tag_name }}</div>
                       <h1>RiSA</h1>
-                      <p>Postman 스타일의 직관적인 RSA 암호화 데스크톱 앱</p>
+                      <p>간단하고 직관적인 RSA 암호화 데스크톱 앱</p>
+                  </div>
+              </section>
+
+              <section class="screenshot">
+                  <div class="container">
+                      <div class="screenshot-container">
+                          <img src="https://raw.githubusercontent.com/0-ROK/RiSA/main/assets/screenshot.png" alt="RiSA 앱 스크린샷" class="app-screenshot">
+                      </div>
                   </div>
               </section>
 
@@ -416,22 +439,17 @@ jobs:
                           <div class="feature-card">
                               <div class="feature-icon">🔒</div>
                               <h3>RSA 암호화</h3>
-                              <p>업계 표준 RSA 알고리즘을 사용한 안전한 암호화</p>
+                              <p>안전한 RSA 알고리즘으로 텍스트 암호화/복호화</p>
                           </div>
                           <div class="feature-card">
                               <div class="feature-icon">🎨</div>
                               <h3>직관적인 UI</h3>
-                              <p>Postman 스타일의 깔끔하고 사용하기 쉬운 인터페이스</p>
+                              <p>깔끔하고 사용하기 쉬운 데스크톱 인터페이스</p>
                           </div>
                           <div class="feature-card">
                               <div class="feature-icon">🔧</div>
                               <h3>키 관리</h3>
-                              <p>RSA 키 생성, 가져오기, 내보내기 기능</p>
-                          </div>
-                          <div class="feature-card">
-                              <div class="feature-icon">⚡</div>
-                              <h3>빠른 처리</h3>
-                              <p>Electron 기반의 네이티브 데스크톱 앱 성능</p>
+                              <p>RSA 키 쌍 생성, 가져오기, 내보내기</p>
                           </div>
                       </div>
                   </div>
@@ -451,12 +469,13 @@ jobs:
               <script>
                   // 다운로드 링크 생성
                   const assets = ${{ steps.get_release.outputs.assets }};
+                  const tagName = '${{ steps.get_release.outputs.tag_name }}';
                   const downloadGrid = document.getElementById('download-grid');
                   
                   const platformData = {
-                      'win': { name: '🪟 Windows', icon: '🪟', extensions: ['.exe', '.msi'] },
-                      'mac': { name: '🍎 macOS', icon: '🍎', extensions: ['.dmg', '.zip'] },
-                      'linux': { name: '🐧 Linux', icon: '🐧', extensions: ['.AppImage', '.deb'] }
+                      'win': { name: '🪟 Windows', icon: '🪟', fallbackUrl: `https://github.com/0-ROK/RiSA/releases/download/${tagName}/RiSA-1.0.0-win.exe` },
+                      'mac': { name: '🍎 macOS', icon: '🍎', fallbackUrl: `https://github.com/0-ROK/RiSA/releases/download/${tagName}/RiSA-1.0.0-mac-x64.dmg` },
+                      'linux': { name: '🐧 Linux', icon: '🐧', fallbackUrl: `https://github.com/0-ROK/RiSA/releases/download/${tagName}/RiSA-1.0.0-linux-x64.AppImage` }
                   };
                   
                   function formatFileSize(bytes) {
@@ -466,24 +485,48 @@ jobs:
                       return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
                   }
                   
-                  Object.keys(platformData).forEach(platform => {
-                      const platformAssets = assets.filter(asset => 
-                          asset.name.toLowerCase().includes(platform)
-                      );
-                      
-                      if (platformAssets.length > 0) {
+                  // assets가 비어있거나 없는 경우 폴백 처리
+                  if (!assets || assets.length === 0) {
+                      Object.keys(platformData).forEach(platform => {
+                          const card = document.createElement('div');
+                          card.className = 'download-card';
+                          
+                          card.innerHTML = `
+                              <div class="platform-icon">${platformData[platform].icon}</div>
+                              <h3>${platformData[platform].name}</h3>
+                              <a href="https://github.com/0-ROK/RiSA/releases/latest" class="download-btn">
+                                  최신 릴리즈에서 다운로드
+                              </a>
+                          `;
+                          
+                          downloadGrid.appendChild(card);
+                      });
+                  } else {
+                      Object.keys(platformData).forEach(platform => {
+                          const platformAssets = assets.filter(asset => 
+                              asset.name.toLowerCase().includes(platform)
+                          );
+                          
                           const card = document.createElement('div');
                           card.className = 'download-card';
                           
                           let downloadButtons = '';
-                          platformAssets.forEach(asset => {
-                              downloadButtons += `
-                                  <a href="${asset.download_url}" class="download-btn">
-                                      ${asset.name}
-                                      <div class="file-size">${formatFileSize(asset.size)}</div>
+                          if (platformAssets.length > 0) {
+                              platformAssets.forEach(asset => {
+                                  downloadButtons += `
+                                      <a href="${asset.download_url}" class="download-btn">
+                                          ${asset.name}
+                                          <div class="file-size">${formatFileSize(asset.size)}</div>
+                                      </a>
+                                  `;
+                              });
+                          } else {
+                              downloadButtons = `
+                                  <a href="https://github.com/0-ROK/RiSA/releases/latest" class="download-btn">
+                                      최신 릴리즈에서 다운로드
                                   </a>
                               `;
-                          });
+                          }
                           
                           card.innerHTML = `
                               <div class="platform-icon">${platformData[platform].icon}</div>
@@ -492,8 +535,8 @@ jobs:
                           `;
                           
                           downloadGrid.appendChild(card);
-                      }
-                  });
+                      });
+                  }
               </script>
           </body>
           </html>
