@@ -26,7 +26,7 @@
     "crypto",
     "desktop"
   ],
-  "author": "RiSA Team",
+  "author": "RiSA Team <noreply@github.com>",
   "license": "MIT",
   "description": "RiSA - RSA Encryption Desktop Application with Postman-style GUI",
   "homepage": "https://github.com/0-ROK/RiSA",
