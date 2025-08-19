@@ -90,6 +90,7 @@ const MainPage: React.FC = () => {
       message.success('암호화가 완료되었습니다.');
     } catch (error) {
       setEncryptionStatus('error');
+      setEncryptedResult(''); // 실패 시 결과 비우기
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       setLastError(errorMessage);
       
@@ -121,6 +122,30 @@ const MainPage: React.FC = () => {
       return;
     }
 
+    // Base64 형식 사전 검증
+    const validation = validateBase64Format(decryptText);
+    if (!validation.isValid) {
+      setDecryptionStatus('error');
+      setDecryptedResult('');
+      
+      notification.error({
+        message: '입력 데이터 오류',
+        description: (
+          <div>
+            <div style={{ marginBottom: 8 }}><strong>검증 실패:</strong> {validation.error}</div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              <ExclamationCircleOutlined style={{ marginRight: 4 }} />
+              암호화된 데이터가 올바른 Base64 형식인지 확인해주세요.
+            </div>
+          </div>
+        ),
+        icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+        placement: 'topRight',
+        duration: 6,
+      });
+      return;
+    }
+
     setLoading(true);
     setDecryptionStatus('idle');
     try {
@@ -134,27 +159,40 @@ const MainPage: React.FC = () => {
       message.success('복호화가 완료되었습니다.');
     } catch (error) {
       setDecryptionStatus('error');
+      setDecryptedResult(''); // 실패 시 결과 비우기
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       setLastError(errorMessage);
       
       // 오류 타입에 따른 구체적인 가이드 제공
       let helpText = '';
-      if (errorMessage.includes('키')) {
-        helpText = '사용 중인 키가 올바른지 확인해주세요. 암호화할 때 사용한 키와 동일한 키 쌍을 사용해야 합니다.';
+      let errorCategory = '복호화 오류';
+      
+      if (errorMessage.includes('입력 데이터 검증 실패') || errorMessage.includes('Base64')) {
+        errorCategory = 'Base64 형식 오류';
+        helpText = '암호화된 데이터가 올바른 Base64 형식인지 확인해주세요. 복사 중 일부 문자가 누락되거나 추가되었을 수 있습니다.';
+      } else if (errorMessage.includes('패딩')) {
+        errorCategory = '패딩 알고리즘 오류';
+        helpText = '암호화할 때 사용한 알고리즘(RSA-OAEP 또는 RSA-PKCS1)과 동일한 알고리즘을 선택했는지 확인해주세요.';
+      } else if (errorMessage.includes('키')) {
+        errorCategory = '키 불일치 오류';
+        helpText = '현재 선택한 개인키가 암호화할 때 사용한 공개키와 쌍을 이루는 키인지 확인해주세요.';
       } else if (errorMessage.includes('알고리즘')) {
-        helpText = '암호화할 때 사용한 알고리즘과 동일한 알고리즘을 선택해주세요.';
-      } else if (errorMessage.includes('형식')) {
-        helpText = '입력한 암호화 데이터가 올바른 형식인지 확인해주세요.';
+        errorCategory = '알고리즘 불일치 오류';
+        helpText = '암호화할 때 사용한 알고리즘과 동일한 알고리즘을 선택해주세요. RSA-OAEP로 암호화했다면 RSA-OAEP로 복호화해야 합니다.';
+      } else if (errorMessage.includes('디코딩') || errorMessage.includes('decode')) {
+        errorCategory = '데이터 손상 오류';
+        helpText = '암호화 데이터가 손상되었거나 잘못된 형식입니다. 원본 암호화 데이터를 다시 복사해주세요.';
       } else {
-        helpText = '암호화 데이터, 키, 그리고 알고리즘이 모두 일치하는지 확인해주세요.';
+        errorCategory = '복호화 실패';
+        helpText = '암호화 데이터, 키, 알고리즘이 모두 올바른지 확인해주세요. 문제가 계속되면 데이터를 새로 암호화해보세요.';
       }
       
       notification.error({
-        message: '복호화 실패',
+        message: errorCategory,
         description: (
           <div>
-            <div style={{ marginBottom: 8 }}><strong>오류:</strong> {errorMessage}</div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
+            <div style={{ marginBottom: 8, color: '#ff4d4f' }}><strong>{errorMessage}</strong></div>
+            <div style={{ fontSize: '12px', color: '#666', lineHeight: '1.4' }}>
               <ExclamationCircleOutlined style={{ marginRight: 4 }} />
               {helpText}
             </div>
@@ -163,6 +201,7 @@ const MainPage: React.FC = () => {
         icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
         placement: 'topRight',
         duration: 8,
+        style: { width: 400 },
       });
       console.error('Decryption error:', error);
     } finally {
@@ -249,6 +288,63 @@ const MainPage: React.FC = () => {
 
   const getCharacterCount = (text: string) => {
     return `${text.length} 문자`;
+  };
+
+  // Base64 형식 검증 함수
+  const validateBase64Format = (data: string): { isValid: boolean; error?: string } => {
+    try {
+      // 공백 제거
+      const cleanData = data.trim().replace(/\s/g, '');
+      
+      // 빈 문자열 체크
+      if (!cleanData) {
+        return { isValid: false, error: '데이터가 비어있습니다.' };
+      }
+      
+      // Base64 기본 문자 집합 검증 (A-Z, a-z, 0-9, +, /, =)
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(cleanData)) {
+        return { isValid: false, error: 'Base64 형식이 아닙니다. 올바른 문자(A-Z, a-z, 0-9, +, /, =)만 사용해주세요.' };
+      }
+      
+      // 길이 검증 (Base64는 4의 배수여야 함)
+      if (cleanData.length % 4 !== 0) {
+        return { isValid: false, error: 'Base64 데이터 길이가 올바르지 않습니다. 4의 배수여야 합니다.' };
+      }
+      
+      // 패딩 검증
+      const paddingIndex = cleanData.indexOf('=');
+      if (paddingIndex !== -1) {
+        const paddingPart = cleanData.substring(paddingIndex);
+        // = 는 맨 끝에만 올 수 있고, = 이후에는 = 만 올 수 있음
+        if (paddingPart !== '=' && paddingPart !== '==') {
+          return { isValid: false, error: 'Base64 패딩(=)이 올바르지 않습니다.' };
+        }
+        // = 앞에 다른 = 가 오면 안됨
+        const beforePadding = cleanData.substring(0, paddingIndex);
+        if (beforePadding.includes('=')) {
+          return { isValid: false, error: 'Base64 패딩(=)의 위치가 올바르지 않습니다.' };
+        }
+      }
+      
+      // 실제 Base64 디코딩 테스트
+      try {
+        // 브라우저 내장 atob 함수로 검증
+        atob(cleanData);
+      } catch (decodeError) {
+        return { isValid: false, error: 'Base64 디코딩에 실패했습니다. 데이터가 손상되었을 수 있습니다.' };
+      }
+      
+      // RSA 암호화 데이터는 보통 최소한의 길이를 가져야 함
+      if (cleanData.length < 100) {
+        return { isValid: false, error: 'RSA 암호화 데이터로는 너무 짧습니다.' };
+      }
+      
+      return { isValid: true };
+      
+    } catch (error) {
+      return { isValid: false, error: '데이터 검증 중 오류가 발생했습니다.' };
+    }
   };
 
   // 결과 영역 상태별 스타일 반환

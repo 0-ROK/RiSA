@@ -100,6 +100,41 @@ ipcMain.handle(IPC_CHANNELS.GENERATE_RSA_KEYS, (_, keySize: number): RSAKeyPair 
   }
 });
 
+// Base64 형식 검증 함수
+const validateBase64 = (data: string): { isValid: boolean; error?: string } => {
+  try {
+    const cleanData = data.trim().replace(/\s/g, '');
+    
+    if (!cleanData) {
+      return { isValid: false, error: 'Base64 데이터가 비어있습니다' };
+    }
+    
+    // Base64 문자 집합 검증
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(cleanData)) {
+      return { isValid: false, error: 'Base64 형식이 올바르지 않습니다' };
+    }
+    
+    // 길이 검증
+    if (cleanData.length % 4 !== 0) {
+      return { isValid: false, error: 'Base64 데이터 길이가 올바르지 않습니다 (4의 배수가 아님)' };
+    }
+    
+    // 패딩 검증
+    const paddingIndex = cleanData.indexOf('=');
+    if (paddingIndex !== -1) {
+      const paddingPart = cleanData.substring(paddingIndex);
+      if (paddingPart !== '=' && paddingPart !== '==') {
+        return { isValid: false, error: 'Base64 패딩이 올바르지 않습니다' };
+      }
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    return { isValid: false, error: 'Base64 데이터 검증 중 오류 발생' };
+  }
+};
+
 // 하이브리드 암호화 함수 - RSA-OAEP는 node-rsa, RSA-PKCS1은 node-forge 사용
 const encryptWithAlgorithm = (text: string, publicKeyPem: string, algorithm: string): string => {
   if (algorithm === 'RSA-PKCS1') {
@@ -116,16 +151,39 @@ const encryptWithAlgorithm = (text: string, publicKeyPem: string, algorithm: str
 };
 
 const decryptWithAlgorithm = (encryptedText: string, privateKeyPem: string, algorithm: string): string => {
-  if (algorithm === 'RSA-PKCS1') {
-    // node-forge를 사용하여 PKCS#1 v1.5 패딩으로 복호화
-    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
-    const encrypted = forge.util.decode64(encryptedText);
-    return privateKey.decrypt(encrypted); // 기본이 PKCS#1 v1.5
-  } else {
-    // node-rsa를 사용하여 OAEP 패딩으로 복호화
-    const key = new NodeRSA(privateKeyPem);
-    key.setOptions({ encryptionScheme: 'pkcs1_oaep' });
-    return key.decrypt(encryptedText, 'utf8');
+  // Base64 사전 검증
+  const validation = validateBase64(encryptedText);
+  if (!validation.isValid) {
+    throw new Error(`입력 데이터 검증 실패: ${validation.error}`);
+  }
+
+  try {
+    if (algorithm === 'RSA-PKCS1') {
+      // node-forge를 사용하여 PKCS#1 v1.5 패딩으로 복호화
+      const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+      const encrypted = forge.util.decode64(encryptedText);
+      return privateKey.decrypt(encrypted); // 기본이 PKCS#1 v1.5
+    } else {
+      // node-rsa를 사용하여 OAEP 패딩으로 복호화
+      const key = new NodeRSA(privateKeyPem);
+      key.setOptions({ encryptionScheme: 'pkcs1_oaep' });
+      return key.decrypt(encryptedText, 'utf8');
+    }
+  } catch (error) {
+    // 구체적인 오류 메시지 분류
+    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+    
+    if (errorMessage.includes('decode') || errorMessage.includes('invalid')) {
+      throw new Error(`Base64 디코딩 실패: 암호화 데이터가 손상되었을 수 있습니다`);
+    } else if (errorMessage.includes('key') || errorMessage.includes('Key')) {
+      throw new Error(`키 오류: 올바른 개인키를 사용하고 있는지 확인해주세요`);
+    } else if (errorMessage.includes('algorithm') || errorMessage.includes('scheme')) {
+      throw new Error(`알고리즘 오류: 암호화할 때 사용한 알고리즘과 동일한지 확인해주세요`);
+    } else if (errorMessage.includes('padding')) {
+      throw new Error(`패딩 오류: 암호화와 복호화 알고리즘이 일치하지 않습니다`);
+    } else {
+      throw new Error(`복호화 실패: ${errorMessage}`);
+    }
   }
 };
 
