@@ -126,6 +126,7 @@ jobs:
           merge-multiple: true
 
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           draft: false
@@ -156,27 +157,37 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Get latest release
+      - name: Get release info from tag
         id: get_release
         uses: actions/github-script@v7
         with:
           script: |
-            const { data } = await github.rest.repos.getLatestRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
+            const tagName = context.ref.replace('refs/tags/', '');
             
-            core.setOutput('tag_name', data.tag_name);
-            core.setOutput('release_url', data.html_url);
-            
-            const assets = data.assets.map(asset => ({
-              name: asset.name,
-              download_url: asset.browser_download_url,
-              size: asset.size,
-              download_count: asset.download_count
-            }));
-            
-            core.setOutput('assets', JSON.stringify(assets));
+            try {
+              const { data } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName
+              });
+              
+              core.setOutput('tag_name', data.tag_name);
+              core.setOutput('release_url', data.html_url);
+              
+              const assets = data.assets.map(asset => ({
+                name: asset.name,
+                download_url: asset.browser_download_url,
+                size: asset.size,
+                download_count: asset.download_count
+              }));
+              
+              core.setOutput('assets', JSON.stringify(assets));
+            } catch (error) {
+              console.log('Release not found yet, using tag info:', tagName);
+              core.setOutput('tag_name', tagName);
+              core.setOutput('release_url', `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tagName}`);
+              core.setOutput('assets', '[]');
+            }
 
       - name: Generate landing page
         run: |
