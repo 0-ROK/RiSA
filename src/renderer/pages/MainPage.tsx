@@ -152,6 +152,18 @@ const MainPage: React.FC = () => {
     return `${text.length} 문자`;
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent, type: 'encrypt' | 'decrypt') => {
+    // Cmd+Enter (macOS) 또는 Ctrl+Enter (Windows/Linux)
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      if (type === 'encrypt') {
+        handleEncrypt();
+      } else {
+        handleDecrypt();
+      }
+    }
+  };
+
   return (
     <div style={{ 
       padding: '24px', 
@@ -293,7 +305,8 @@ const MainPage: React.FC = () => {
                             <TextArea
                               value={encryptText}
                               onChange={(e) => setEncryptText(e.target.value)}
-                              placeholder="암호화할 텍스트를 입력하세요..."
+                              onKeyDown={(e) => handleKeyDown(e, 'encrypt')}
+                              placeholder="암호화할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 암호화)"
                               style={{ 
                                 flex: 1,
                                 resize: 'none',
@@ -310,6 +323,7 @@ const MainPage: React.FC = () => {
                               loading={loading}
                               onClick={handleEncrypt}
                               disabled={!selectedKey || !encryptText.trim()}
+                              title="암호화 (Cmd/Ctrl+Enter)"
                             >
                               암호화
                             </Button>
@@ -426,7 +440,8 @@ const MainPage: React.FC = () => {
                             <TextArea
                               value={decryptText}
                               onChange={(e) => setDecryptText(e.target.value)}
-                              placeholder="복호화할 암호화된 텍스트를 입력하세요..."
+                              onKeyDown={(e) => handleKeyDown(e, 'decrypt')}
+                              placeholder="복호화할 암호화된 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 복호화)"
                               style={{ 
                                 flex: 1,
                                 fontFamily: 'monospace',
@@ -444,6 +459,7 @@ const MainPage: React.FC = () => {
                               loading={loading}
                               onClick={handleDecrypt}
                               disabled={!selectedKey || !decryptText.trim()}
+                              title="복호화 (Cmd/Ctrl+Enter)"
                             >
                               복호화
                             </Button>
@@ -556,6 +572,12 @@ const MainPage: React.FC = () => {
         <TextArea
           value={fullScreenContent}
           onChange={(e) => setFullScreenContent(e.target.value)}
+          onKeyDown={fullScreenType !== 'result' ? (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              handleFullScreenSave();
+            }
+          } : undefined}
           readOnly={fullScreenType === 'result'}
           style={{
             height: '100%',
@@ -564,8 +586,8 @@ const MainPage: React.FC = () => {
             fontSize: '14px'
           }}
           placeholder={
-            fullScreenType === 'encrypt' ? '암호화할 텍스트를 입력하세요...' :
-            fullScreenType === 'decrypt' ? '복호화할 암호화된 텍스트를 입력하세요...' :
+            fullScreenType === 'encrypt' ? '암호화할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
+            fullScreenType === 'decrypt' ? '복호화할 암호화된 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
             ''
           }
         />
