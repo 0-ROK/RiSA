@@ -67,6 +67,7 @@
   "build": {
     "appId": "com.risateam.risa",
     "productName": "RiSA",
+    "publish": null,
     "directories": {
       "output": "release"
     },
