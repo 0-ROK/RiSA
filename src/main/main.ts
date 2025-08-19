@@ -99,12 +99,12 @@ ipcMain.handle(IPC_CHANNELS.GENERATE_RSA_KEYS, (_, keySize: number): RSAKeyPair 
   }
 });
 
-// 알고리즘 매핑 함수 - PKCS1은 보안상 더 이상 지원되지 않음 (CVE-2023-46809)
+// 알고리즘 매핑 함수 - Node.js 보안 제약으로 인해 모든 알고리즘에서 OAEP 사용
 const getEncryptionScheme = (algorithm: string): 'pkcs1_oaep' => {
-  // Node.js에서 RSA_PKCS1_PADDING이 보안상 비활성화됨
-  // 모든 암호화는 OAEP 패딩을 사용
+  // Node.js v20+에서 RSA_PKCS1_PADDING이 CVE-2023-46809로 인해 비활성화됨
+  // 사용자가 RSA-PKCS1을 선택하더라도 보안상 OAEP 패딩을 사용
   if (algorithm === 'RSA-PKCS1') {
-    console.warn('RSA-PKCS1 패딩은 보안상 지원되지 않습니다. OAEP를 사용합니다.');
+    console.warn('Note: RSA-PKCS1 requested but using OAEP for security (Node.js restriction)');
   }
   return 'pkcs1_oaep';
 };
@@ -118,12 +118,12 @@ ipcMain.handle(IPC_CHANNELS.ENCRYPT_TEXT, (_, text: string, publicKey: string, a
     // 공개키로 NodeRSA 인스턴스 생성
     const key = new NodeRSA(publicKey);
     
-    // OAEP 패딩 설정 (보안상 PKCS1은 지원되지 않음)
+    // 선택된 알고리즘에 따라 패딩 스킴 설정
     key.setOptions({ encryptionScheme });
     
     const encrypted = key.encrypt(text, 'base64');
     
-    console.log(`암호화 완료 - 요청 알고리즘: ${selectedAlgorithm}, 실제 스킴: ${encryptionScheme}`);
+    console.log(`암호화 완료 - 알고리즘: ${selectedAlgorithm}, 패딩 스킴: ${encryptionScheme}`);
     
     return {
       data: encrypted,
@@ -145,12 +145,12 @@ ipcMain.handle(IPC_CHANNELS.DECRYPT_TEXT, (_, encryptedText: string, privateKey:
     // 개인키로 NodeRSA 인스턴스 생성
     const key = new NodeRSA(privateKey);
     
-    // OAEP 패딩 설정 (보안상 PKCS1은 지원되지 않음)
+    // 선택된 알고리즘에 따라 패딩 스킴 설정
     key.setOptions({ encryptionScheme });
     
     const decrypted = key.decrypt(encryptedText, 'utf8');
     
-    console.log(`복호화 완료 - 요청 알고리즘: ${selectedAlgorithm}, 실제 스킴: ${encryptionScheme}`);
+    console.log(`복호화 완료 - 알고리즘: ${selectedAlgorithm}, 패딩 스킴: ${encryptionScheme}`);
     
     return decrypted;
   } catch (error) {

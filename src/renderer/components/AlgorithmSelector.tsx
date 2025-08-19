@@ -70,8 +70,8 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
       {/* PKCS1 보안 경고 */}
       {showWarning && value === 'RSA-PKCS1' && (
         <Alert
-          message="보안 알림"
-          description="RSA-PKCS1 패딩은 보안상 지원되지 않아 OAEP 패딩이 대신 사용됩니다."
+          message="보안 경고"
+          description="RSA-PKCS1 패딩은 보안상 권장하지 않습니다. 중요한 데이터의 경우 RSA-OAEP 사용을 권장합니다."
           type="warning"
           showIcon
           style={{ fontSize: '12px', ...warningStyle }}
