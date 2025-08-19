@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { ConfigProvider, theme } from 'antd';
+import { HashRouter } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
 import App from './App';
 import { KeyProvider } from './store/KeyContext';
 
@@ -10,11 +10,10 @@ const root = createRoot(container!);
 
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
+    <HashRouter>
       <KeyProvider>
         <ConfigProvider
           theme={{
-            algorithm: theme.defaultAlgorithm,
             token: {
               colorPrimary: '#1890ff',
             },
@@ -23,6 +22,6 @@ root.render(
           <App />
         </ConfigProvider>
       </KeyProvider>
-    </BrowserRouter>
+    </HashRouter>
   </React.StrictMode>
 );
