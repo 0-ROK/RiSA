@@ -149,9 +149,9 @@
       "oneClick": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icons/icon.ico",
-      "uninstallerIcon": "assets/icons/icon.ico",
-      "installerHeaderIcon": "assets/icons/icon.ico",
+      "installerIcon": "assets/icons/RiSA.png",
+      "uninstallerIcon": "assets/icons/RiSA.png",
+      "installerHeaderIcon": "assets/icons/RiSA.png",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
