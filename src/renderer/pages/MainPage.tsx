@@ -90,9 +90,17 @@ const MainPage: React.FC = () => {
       message.success('암호화가 완료되었습니다.');
     } catch (error) {
       setEncryptionStatus('error');
-      setEncryptedResult(''); // 실패 시 결과 비우기
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       setLastError(errorMessage);
+
+      // 결과 영역에 표시할 도움말 문구 생성
+      const helpMessage = `❌ 암호화 실패
+
+• 텍스트가 너무 긴지 확인
+• 올바른 공개키를 선택했는지 확인
+• 키와 알고리즘이 호환되는지 확인`;
+
+      setEncryptedResult(helpMessage);
       
       notification.error({
         message: '암호화 실패',
@@ -126,7 +134,14 @@ const MainPage: React.FC = () => {
     const validation = validateBase64Format(decryptText);
     if (!validation.isValid) {
       setDecryptionStatus('error');
-      setDecryptedResult('');
+      
+      // Base64 검증 실패 시 도움말 문구
+      const base64HelpMessage = `❌ 입력 데이터 오류
+
+• 암호화 데이터를 다시 복사해주세요
+• 앞뒤 공백이나 불필요한 문자 제거`;
+
+      setDecryptedResult(base64HelpMessage);
       
       notification.error({
         message: '입력 데이터 오류',
@@ -159,7 +174,8 @@ const MainPage: React.FC = () => {
       message.success('복호화가 완료되었습니다.');
     } catch (error) {
       setDecryptionStatus('error');
-      setDecryptedResult(''); // 실패 시 결과 비우기
+      
+      // 실패 시 도움말 문구 설정
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       setLastError(errorMessage);
       
@@ -186,6 +202,15 @@ const MainPage: React.FC = () => {
         errorCategory = '복호화 실패';
         helpText = '암호화 데이터, 키, 알고리즘이 모두 올바른지 확인해주세요. 문제가 계속되면 데이터를 새로 암호화해보세요.';
       }
+
+      // 결과 영역에 표시할 도움말 문구 생성
+      const helpMessage = `❌ 복호화 실패
+
+• 올바른 개인키를 선택했는지 확인
+• 암호화할 때와 같은 알고리즘 사용
+• 암호화 데이터가 완전히 복사되었는지 확인`;
+
+      setDecryptedResult(helpMessage);
       
       notification.error({
         message: errorCategory,
@@ -372,6 +397,11 @@ const MainPage: React.FC = () => {
         border: '2px solid #ff4d4f',
         backgroundColor: '#fff2f0',
         boxShadow: '0 0 0 2px rgba(255, 77, 79, 0.2)',
+        fontFamily: 'inherit', // 오류 메시지는 일반 폰트 사용
+        fontSize: '14px',
+        lineHeight: '1.5',
+        color: '#262626',
+        padding: '16px',
       };
     }
 
