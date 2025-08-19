@@ -5,6 +5,20 @@ export const DEFAULT_ENCRYPTION_OPTIONS = {
   algorithm: 'RSA-OAEP' as const,
 };
 
+// 알고리즘 설명 및 보안 정보
+export const ALGORITHM_INFO = {
+  'RSA-OAEP': {
+    name: 'RSA-OAEP',
+    description: 'OAEP 패딩을 사용하는 RSA 암호화 (권장)',
+    status: 'recommended',
+  },
+  'RSA-PKCS1': {
+    name: 'RSA-PKCS1',
+    description: 'PKCS#1 v1.5 패딩 (보안상 OAEP로 대체됨)',
+    status: 'deprecated',
+  },
+} as const;
+
 export const IPC_CHANNELS = {
   // Key management
   GET_SAVED_KEYS: 'get-saved-keys',

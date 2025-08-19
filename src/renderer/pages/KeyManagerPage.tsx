@@ -11,7 +11,8 @@ import {
   Select,
   Form,
   Popconfirm,
-  Tooltip
+  Tooltip,
+  Alert
 } from 'antd';
 import { 
   KeyOutlined, 
@@ -24,7 +25,7 @@ import {
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
 import { SavedKey } from '../../shared/types';
-import { RSA_KEY_SIZES } from '../../shared/constants';
+import { RSA_KEY_SIZES, ALGORITHM_INFO } from '../../shared/constants';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -39,6 +40,8 @@ const KeyManagerPage: React.FC = () => {
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [form] = Form.useForm();
   const [importForm] = Form.useForm();
+  const [selectedGenerateAlgorithm, setSelectedGenerateAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
+  const [selectedImportAlgorithm, setSelectedImportAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
 
   const handleGenerateKey = async (values: { name: string; keySize: number; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
     setGenerateLoading(true);
@@ -411,11 +414,36 @@ const KeyManagerPage: React.FC = () => {
               rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
               tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
             >
-              <Select>
-                <Select.Option value="RSA-OAEP">RSA-OAEP (권장)</Select.Option>
-                <Select.Option value="RSA-PKCS1">RSA-PKCS1</Select.Option>
+              <Select onChange={setSelectedGenerateAlgorithm}>
+                <Select.Option value="RSA-OAEP">
+                  <div>
+                    <div>{ALGORITHM_INFO['RSA-OAEP'].name}</div>
+                    <div style={{ fontSize: '11px', color: '#52c41a', marginTop: '2px' }}>
+                      {ALGORITHM_INFO['RSA-OAEP'].description}
+                    </div>
+                  </div>
+                </Select.Option>
+                <Select.Option value="RSA-PKCS1">
+                  <div>
+                    <div>{ALGORITHM_INFO['RSA-PKCS1'].name}</div>
+                    <div style={{ fontSize: '11px', color: '#ff7875', marginTop: '2px' }}>
+                      {ALGORITHM_INFO['RSA-PKCS1'].description}
+                    </div>
+                  </div>
+                </Select.Option>
               </Select>
             </Form.Item>
+
+            {/* PKCS1 보안 경고 */}
+            {selectedGenerateAlgorithm === 'RSA-PKCS1' && (
+              <Alert
+                message="보안 알림"
+                description="RSA-PKCS1 패딩은 보안상 지원되지 않아 OAEP 패딩이 대신 사용됩니다."
+                type="warning"
+                showIcon
+                style={{ marginBottom: '16px' }}
+              />
+            )}
 
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
               <Button onClick={() => setGenerateModalVisible(false)}>
@@ -474,11 +502,36 @@ const KeyManagerPage: React.FC = () => {
               rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
               tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
             >
-              <Select>
-                <Select.Option value="RSA-OAEP">RSA-OAEP (권장)</Select.Option>
-                <Select.Option value="RSA-PKCS1">RSA-PKCS1</Select.Option>
+              <Select onChange={setSelectedImportAlgorithm}>
+                <Select.Option value="RSA-OAEP">
+                  <div>
+                    <div>{ALGORITHM_INFO['RSA-OAEP'].name}</div>
+                    <div style={{ fontSize: '11px', color: '#52c41a', marginTop: '2px' }}>
+                      {ALGORITHM_INFO['RSA-OAEP'].description}
+                    </div>
+                  </div>
+                </Select.Option>
+                <Select.Option value="RSA-PKCS1">
+                  <div>
+                    <div>{ALGORITHM_INFO['RSA-PKCS1'].name}</div>
+                    <div style={{ fontSize: '11px', color: '#ff7875', marginTop: '2px' }}>
+                      {ALGORITHM_INFO['RSA-PKCS1'].description}
+                    </div>
+                  </div>
+                </Select.Option>
               </Select>
             </Form.Item>
+
+            {/* PKCS1 보안 경고 */}
+            {selectedImportAlgorithm === 'RSA-PKCS1' && (
+              <Alert
+                message="보안 알림"
+                description="RSA-PKCS1 패딩은 보안상 지원되지 않아 OAEP 패딩이 대신 사용됩니다."
+                type="warning"
+                showIcon
+                style={{ marginBottom: '16px' }}
+              />
+            )}
 
             <Form.Item
               label="공개키 (Public Key)"

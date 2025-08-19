@@ -23,7 +23,7 @@ import {
   CompressOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
-import { RSA_ALGORITHMS, DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
+import { RSA_ALGORITHMS, DEFAULT_ENCRYPTION_OPTIONS, ALGORITHM_INFO } from '../../shared/constants';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -41,6 +41,7 @@ const MainPage: React.FC = () => {
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [fullScreenType, setFullScreenType] = useState<'encrypt' | 'decrypt' | 'result'>('encrypt');
   const [fullScreenContent, setFullScreenContent] = useState('');
+  const [activeTab, setActiveTab] = useState('encrypt');
 
   // 선택된 키가 변경될 때마다 selectedKey 업데이트 및 알고리즘 자동 설정
   useEffect(() => {
@@ -64,6 +65,10 @@ const MainPage: React.FC = () => {
       return;
     }
 
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await window.electronAPI.encryptText(
@@ -75,7 +80,7 @@ const MainPage: React.FC = () => {
       message.success('암호화가 완료되었습니다.');
     } catch (error) {
       message.error('암호화 중 오류가 발생했습니다.');
-      console.error(error);
+      console.error('Encryption error:', error);
     } finally {
       setLoading(false);
     }
@@ -92,6 +97,10 @@ const MainPage: React.FC = () => {
       return;
     }
 
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await window.electronAPI.decryptText(
@@ -103,7 +112,7 @@ const MainPage: React.FC = () => {
       message.success('복호화가 완료되었습니다.');
     } catch (error) {
       message.error('복호화 중 오류가 발생했습니다. 키와 텍스트를 확인해주세요.');
-      console.error(error);
+      console.error('Decryption error:', error);
     } finally {
       setLoading(false);
     }
@@ -156,12 +165,61 @@ const MainPage: React.FC = () => {
     // Cmd+Enter (macOS) 또는 Ctrl+Enter (Windows/Linux)
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
+      e.stopPropagation();
+      
+      // 기본 조건 확인
+      if (loading) {
+        return;
+      }
+      
+      if (!selectedKey) {
+        message.error('먼저 키를 선택해주세요.');
+        return;
+      }
+      
+      const hasInputText = type === 'encrypt' ? encryptText.trim() : decryptText.trim();
+      if (!hasInputText) {
+        message.error(`${type === 'encrypt' ? '암호화' : '복호화'}할 텍스트를 입력해주세요.`);
+        return;
+      }
+      
+      // 실행
       if (type === 'encrypt') {
         handleEncrypt();
       } else {
         handleDecrypt();
       }
     }
+  };
+
+  // 탭 오른쪽에 표시할 버튼들
+  const renderTabBarExtraContent = () => {
+    const isEncryptTab = activeTab === 'encrypt';
+    const hasInputText = isEncryptTab ? encryptText.trim() : decryptText.trim();
+    const canExecute = selectedKey && hasInputText && !loading;
+    
+    return (
+      <Space>
+        <Button 
+          type="primary" 
+          icon={isEncryptTab ? <LockOutlined /> : <UnlockOutlined />}
+          loading={loading}
+          onClick={isEncryptTab ? handleEncrypt : handleDecrypt}
+          disabled={!canExecute}
+          title={isEncryptTab ? "암호화 (Cmd/Ctrl+Enter)" : "복호화 (Cmd/Ctrl+Enter)"}
+        >
+          {isEncryptTab ? '암호화' : '복호화'}
+        </Button>
+        <Button 
+          icon={<ClearOutlined />}
+          onClick={() => handleClear(isEncryptTab ? 'encrypt' : 'decrypt')}
+          disabled={loading}
+          title="입력 및 결과 초기화"
+        >
+          초기화
+        </Button>
+      </Space>
+    );
   };
 
   return (
@@ -184,8 +242,8 @@ const MainPage: React.FC = () => {
         
         {/* 키 선택 및 알고리즘 선택 섹션 */}
         <Card style={{ marginBottom: 16, flexShrink: 0 }}>
-          <Row gutter={16} align="middle">
-            <Col xs={24} sm={8}>
+          <Row gutter={[16, 16]} align="top">
+            <Col xs={24} md={8}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Text strong>
                   <KeyOutlined style={{ marginRight: 8 }} />
@@ -208,24 +266,38 @@ const MainPage: React.FC = () => {
               </Space>
             </Col>
             
-            <Col xs={24} sm={8}>
+            <Col xs={24} md={8}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Text strong>암호화 알고리즘</Text>
                 <Select
                   style={{ width: '100%' }}
                   value={algorithm}
                   onChange={setAlgorithm}
+                  optionLabelProp="label"
                 >
                   {RSA_ALGORITHMS.map(algo => (
-                    <Select.Option key={algo} value={algo}>
-                      {algo}
+                    <Select.Option 
+                      key={algo} 
+                      value={algo}
+                      label={`${ALGORITHM_INFO[algo].name}${ALGORITHM_INFO[algo].status === 'deprecated' ? ' (보안 경고)' : ' (권장)'}`}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>{ALGORITHM_INFO[algo].name}</div>
+                        <div style={{ 
+                          fontSize: '11px', 
+                          color: ALGORITHM_INFO[algo].status === 'deprecated' ? '#ff7875' : '#52c41a',
+                          marginTop: '2px'
+                        }}>
+                          {ALGORITHM_INFO[algo].description}
+                        </div>
+                      </div>
                     </Select.Option>
                   ))}
                 </Select>
               </Space>
             </Col>
             
-            <Col xs={24} sm={8}>
+            <Col xs={24} md={8}>
               {selectedKey && (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Text strong>선택된 키 정보</Text>
@@ -238,28 +310,48 @@ const MainPage: React.FC = () => {
                     <div><strong>이름:</strong> {selectedKey.name}</div>
                     <div><strong>크기:</strong> {selectedKey.keySize} bits</div>
                     <div><strong>생성일:</strong> {new Date(selectedKey.created).toLocaleDateString('ko-KR')}</div>
+                    {selectedKey.preferredAlgorithm && (
+                      <div><strong>선호 알고리즘:</strong> {selectedKey.preferredAlgorithm}</div>
+                    )}
                   </div>
                 </Space>
               )}
             </Col>
           </Row>
-          
-          {keys.length === 0 && (
-            <Alert
-              message="키가 없습니다"
-              description="먼저 키 관리 탭에서 RSA 키를 생성해주세요."
-              type="warning"
-              showIcon
-              style={{ marginTop: 16 }}
-            />
+
+          {/* 경고 메시지들을 별도 섹션으로 분리 */}
+          {(algorithm === 'RSA-PKCS1' || keys.length === 0) && (
+            <div style={{ marginTop: 16 }}>
+              {algorithm === 'RSA-PKCS1' && (
+                <Alert
+                  message="보안 알림"
+                  description="RSA-PKCS1 패딩은 보안상 지원되지 않아 OAEP 패딩이 대신 사용됩니다."
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: keys.length === 0 ? 12 : 0 }}
+                />
+              )}
+              
+              {keys.length === 0 && (
+                <Alert
+                  message="키가 없습니다"
+                  description="먼저 키 관리 탭에서 RSA 키를 생성해주세요."
+                  type="warning"
+                  showIcon
+                />
+              )}
+            </div>
           )}
         </Card>
         
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <Tabs 
             defaultActiveKey="encrypt" 
+            activeKey={activeTab}
+            onChange={setActiveTab}
             size="large"
             style={{ height: '100%' }}
+            tabBarExtraContent={renderTabBarExtraContent()}
             items={[
               {
                 key: 'encrypt',
@@ -310,30 +402,11 @@ const MainPage: React.FC = () => {
                               style={{ 
                                 flex: 1,
                                 resize: 'none',
-                                maxHeight: 'calc(100vh - 450px)',
+                                maxHeight: 'calc(100vh - 400px)',
                                 overflowY: 'auto'
                               }}
                             />
                           </div>
-                          
-                          <Space style={{ marginTop: 16, flexShrink: 0 }}>
-                            <Button 
-                              type="primary" 
-                              icon={<LockOutlined />}
-                              loading={loading}
-                              onClick={handleEncrypt}
-                              disabled={!selectedKey || !encryptText.trim()}
-                              title="암호화 (Cmd/Ctrl+Enter)"
-                            >
-                              암호화
-                            </Button>
-                            <Button 
-                              icon={<ClearOutlined />}
-                              onClick={() => handleClear('encrypt')}
-                            >
-                              초기화
-                            </Button>
-                          </Space>
                         </Card>
                       </Col>
                       
@@ -446,30 +519,11 @@ const MainPage: React.FC = () => {
                                 flex: 1,
                                 fontFamily: 'monospace',
                                 resize: 'none',
-                                maxHeight: 'calc(100vh - 450px)',
+                                maxHeight: 'calc(100vh - 400px)',
                                 overflowY: 'auto'
                               }}
                             />
                           </div>
-                          
-                          <Space style={{ marginTop: 16, flexShrink: 0 }}>
-                            <Button 
-                              type="primary" 
-                              icon={<UnlockOutlined />}
-                              loading={loading}
-                              onClick={handleDecrypt}
-                              disabled={!selectedKey || !decryptText.trim()}
-                              title="복호화 (Cmd/Ctrl+Enter)"
-                            >
-                              복호화
-                            </Button>
-                            <Button 
-                              icon={<ClearOutlined />}
-                              onClick={() => handleClear('decrypt')}
-                            >
-                              초기화
-                            </Button>
-                          </Space>
                         </Card>
                       </Col>
                       
