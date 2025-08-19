@@ -115,15 +115,35 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      release_files: ${{ steps.get_files.outputs.files }}
+      tag_name: ${{ steps.get_tag.outputs.tag_name }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get tag name
+        id: get_tag
+        run: echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+
+      - name: Get release files info
+        id: get_files
+        run: |
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          find . -name "*-artifacts" -type d | while read dir; do
+            find "$dir" -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) | while read file; do
+              filename=$(basename "$file")
+              size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
+              echo "{\"name\":\"$filename\",\"size\":$size}"
+            done
+          done | jq -s . >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
@@ -157,37 +177,21 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Get release info from tag
+      - name: Get release info from job output
         id: get_release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tagName = context.ref.replace('refs/tags/', '');
-            
-            try {
-              const { data } = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag: tagName
-              });
-              
-              core.setOutput('tag_name', data.tag_name);
-              core.setOutput('release_url', data.html_url);
-              
-              const assets = data.assets.map(asset => ({
-                name: asset.name,
-                download_url: asset.browser_download_url,
-                size: asset.size,
-                download_count: asset.download_count
-              }));
-              
-              core.setOutput('assets', JSON.stringify(assets));
-            } catch (error) {
-              console.log('Release not found yet, using tag info:', tagName);
-              core.setOutput('tag_name', tagName);
-              core.setOutput('release_url', `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tagName}`);
-              core.setOutput('assets', '[]');
-            }
+        run: |
+          echo "tag_name=${{ needs.release.outputs.tag_name }}" >> $GITHUB_OUTPUT
+          echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag_name }}" >> $GITHUB_OUTPUT
+          
+          # Convert release files to assets format with download URLs
+          echo 'assets<<EOF' >> $GITHUB_OUTPUT
+          echo '${{ needs.release.outputs.release_files }}' | jq -r '.[] | {
+            name: .name,
+            download_url: "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.tag_name }}/\(.name)",
+            size: .size,
+            download_count: 0
+          }' | jq -s . >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Generate landing page
         run: |
