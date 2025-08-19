@@ -79,6 +79,7 @@ jobs:
       - name: Package application (Windows)
         if: matrix.os == 'windows-latest'
         env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: pnpm run package:win
@@ -86,12 +87,16 @@ jobs:
       - name: Package application (macOS)
         if: matrix.os == 'macos-latest'
         env:
-          CSC_LINK: certificate.p12
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm run package:mac
+        run: |
+          if [ -f "certificate.p12" ]; then
+            export CSC_LINK=certificate.p12
+            export CSC_KEY_PASSWORD="${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+          fi
+          pnpm run package:mac
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

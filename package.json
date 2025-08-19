@@ -86,7 +86,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "assets/icons/icon.icns",
+      "icon": "assets/icons/RiSA.png",
       "target": [
         {
           "target": "dmg",
@@ -106,7 +106,7 @@
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "win": {
-      "icon": "assets/icons/icon.ico",
+      "icon": "assets/icons/RiSA.png",
       "target": [
         {
           "target": "nsis",
@@ -126,7 +126,7 @@
       "artifactName": "${productName}-${version}-win-${arch}.${ext}"
     },
     "linux": {
-      "icon": "assets/icons/icon.png",
+      "icon": "assets/icons/RiSA.png",
       "category": "Utility",
       "target": [
         {
