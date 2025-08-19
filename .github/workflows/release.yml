@@ -1,0 +1,485 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm run build
+
+      - name: Import Apple certificate (macOS only)
+        if: matrix.os == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+            security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" build.keychain
+            security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$APPLE_KEYCHAIN_PASSWORD" build.keychain
+          fi
+
+      - name: Package application (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm run package:linux
+
+      - name: Package application (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: pnpm run package:win
+
+      - name: Package application (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          CSC_LINK: certificate.p12
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm run package:mac
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-artifacts
+          path: |
+            release/*.exe
+            release/*.msi
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+          retention-days: 5
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            *-artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-pages:
+    needs: release
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      - name: Get latest release
+        id: get_release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            core.setOutput('tag_name', data.tag_name);
+            core.setOutput('release_url', data.html_url);
+            
+            const assets = data.assets.map(asset => ({
+              name: asset.name,
+              download_url: asset.browser_download_url,
+              size: asset.size,
+              download_count: asset.download_count
+            }));
+            
+            core.setOutput('assets', JSON.stringify(assets));
+
+      - name: Generate landing page
+        run: |
+          mkdir -p _site
+          cat > _site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="ko">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>RiSA - RSA 암호화 데스크톱 앱</title>
+              <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { 
+                      font-family: 'Inter', sans-serif; 
+                      line-height: 1.6; 
+                      color: #333;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                  }
+                  .container { 
+                      max-width: 1200px; 
+                      margin: 0 auto; 
+                      padding: 0 20px; 
+                  }
+                  .header {
+                      background: rgba(255, 255, 255, 0.1);
+                      backdrop-filter: blur(10px);
+                      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                      padding: 1rem 0;
+                  }
+                  .nav {
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                  }
+                  .logo {
+                      font-size: 1.5rem;
+                      font-weight: 700;
+                      color: white;
+                      text-decoration: none;
+                  }
+                  .nav-links {
+                      display: flex;
+                      list-style: none;
+                      gap: 2rem;
+                  }
+                  .nav-links a {
+                      color: white;
+                      text-decoration: none;
+                      font-weight: 500;
+                      transition: opacity 0.3s;
+                  }
+                  .nav-links a:hover { opacity: 0.8; }
+                  
+                  .hero {
+                      text-align: center;
+                      padding: 4rem 0;
+                      color: white;
+                  }
+                  .hero h1 {
+                      font-size: 3.5rem;
+                      font-weight: 700;
+                      margin-bottom: 1rem;
+                      background: linear-gradient(45deg, #fff, #f0f0f0);
+                      -webkit-background-clip: text;
+                      -webkit-text-fill-color: transparent;
+                      background-clip: text;
+                  }
+                  .hero p {
+                      font-size: 1.25rem;
+                      margin-bottom: 2rem;
+                      opacity: 0.9;
+                  }
+                  .version-badge {
+                      display: inline-block;
+                      background: rgba(255, 255, 255, 0.2);
+                      padding: 0.5rem 1rem;
+                      border-radius: 50px;
+                      margin-bottom: 2rem;
+                      font-weight: 500;
+                  }
+                  
+                  .downloads {
+                      background: white;
+                      margin: 2rem 0;
+                      border-radius: 20px;
+                      padding: 3rem;
+                      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                  }
+                  .downloads h2 {
+                      text-align: center;
+                      margin-bottom: 2rem;
+                      font-size: 2rem;
+                      color: #333;
+                  }
+                  .download-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 2rem;
+                      margin-top: 2rem;
+                  }
+                  .download-card {
+                      border: 2px solid #f0f0f0;
+                      border-radius: 12px;
+                      padding: 2rem;
+                      text-align: center;
+                      transition: all 0.3s ease;
+                  }
+                  .download-card:hover {
+                      border-color: #667eea;
+                      transform: translateY(-5px);
+                      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+                  }
+                  .platform-icon {
+                      font-size: 3rem;
+                      margin-bottom: 1rem;
+                  }
+                  .download-btn {
+                      display: inline-block;
+                      background: linear-gradient(45deg, #667eea, #764ba2);
+                      color: white;
+                      padding: 1rem 2rem;
+                      border-radius: 8px;
+                      text-decoration: none;
+                      font-weight: 600;
+                      margin: 0.5rem;
+                      transition: all 0.3s ease;
+                  }
+                  .download-btn:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+                  }
+                  .file-size {
+                      font-size: 0.9rem;
+                      color: #666;
+                      margin-top: 0.5rem;
+                  }
+                  
+                  .features {
+                      padding: 4rem 0;
+                      background: rgba(255, 255, 255, 0.1);
+                      backdrop-filter: blur(10px);
+                      margin: 2rem 0;
+                      border-radius: 20px;
+                  }
+                  .features h2 {
+                      text-align: center;
+                      color: white;
+                      font-size: 2rem;
+                      margin-bottom: 3rem;
+                  }
+                  .feature-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                      gap: 2rem;
+                  }
+                  .feature-card {
+                      text-align: center;
+                      color: white;
+                      padding: 2rem;
+                  }
+                  .feature-icon {
+                      font-size: 2.5rem;
+                      margin-bottom: 1rem;
+                  }
+                  .feature-card h3 {
+                      font-size: 1.25rem;
+                      margin-bottom: 1rem;
+                  }
+                  
+                  .footer {
+                      text-align: center;
+                      padding: 2rem 0;
+                      color: rgba(255, 255, 255, 0.8);
+                  }
+                  .footer a {
+                      color: white;
+                      text-decoration: none;
+                  }
+                  
+                  @media (max-width: 768px) {
+                      .hero h1 { font-size: 2.5rem; }
+                      .hero p { font-size: 1.1rem; }
+                      .downloads { padding: 2rem 1rem; }
+                      .nav-links { display: none; }
+                  }
+              </style>
+          </head>
+          <body>
+              <header class="header">
+                  <div class="container">
+                      <nav class="nav">
+                          <a href="#" class="logo">🔐 RiSA</a>
+                          <ul class="nav-links">
+                              <li><a href="#download">다운로드</a></li>
+                              <li><a href="#features">기능</a></li>
+                              <li><a href="https://github.com/0-ROK/RiSA">GitHub</a></li>
+                          </ul>
+                      </nav>
+                  </div>
+              </header>
+
+              <section class="hero">
+                  <div class="container">
+                      <div class="version-badge">최신 버전: ${{ steps.get_release.outputs.tag_name }}</div>
+                      <h1>RiSA</h1>
+                      <p>Postman 스타일의 직관적인 RSA 암호화 데스크톱 앱</p>
+                  </div>
+              </section>
+
+              <section class="downloads" id="download">
+                  <div class="container">
+                      <h2>📥 다운로드</h2>
+                      <div class="download-grid" id="download-grid">
+                          <!-- 다운로드 링크가 여기에 동적으로 생성됩니다 -->
+                      </div>
+                  </div>
+              </section>
+
+              <section class="features" id="features">
+                  <div class="container">
+                      <h2>✨ 주요 기능</h2>
+                      <div class="feature-grid">
+                          <div class="feature-card">
+                              <div class="feature-icon">🔒</div>
+                              <h3>RSA 암호화</h3>
+                              <p>업계 표준 RSA 알고리즘을 사용한 안전한 암호화</p>
+                          </div>
+                          <div class="feature-card">
+                              <div class="feature-icon">🎨</div>
+                              <h3>직관적인 UI</h3>
+                              <p>Postman 스타일의 깔끔하고 사용하기 쉬운 인터페이스</p>
+                          </div>
+                          <div class="feature-card">
+                              <div class="feature-icon">🔧</div>
+                              <h3>키 관리</h3>
+                              <p>RSA 키 생성, 가져오기, 내보내기 기능</p>
+                          </div>
+                          <div class="feature-card">
+                              <div class="feature-icon">⚡</div>
+                              <h3>빠른 처리</h3>
+                              <p>Electron 기반의 네이티브 데스크톱 앱 성능</p>
+                          </div>
+                      </div>
+                  </div>
+              </section>
+
+              <footer class="footer">
+                  <div class="container">
+                      <p>© 2024 RiSA Team. MIT 라이선스로 제공됩니다.</p>
+                      <p>
+                          <a href="https://github.com/0-ROK/RiSA">GitHub</a> |
+                          <a href="https://github.com/0-ROK/RiSA/issues">버그 신고</a> |
+                          <a href="https://github.com/0-ROK/RiSA/releases">릴리즈 노트</a>
+                      </p>
+                  </div>
+              </footer>
+
+              <script>
+                  // 다운로드 링크 생성
+                  const assets = ${{ steps.get_release.outputs.assets }};
+                  const downloadGrid = document.getElementById('download-grid');
+                  
+                  const platformData = {
+                      'win': { name: '🪟 Windows', icon: '🪟', extensions: ['.exe', '.msi'] },
+                      'mac': { name: '🍎 macOS', icon: '🍎', extensions: ['.dmg', '.zip'] },
+                      'linux': { name: '🐧 Linux', icon: '🐧', extensions: ['.AppImage', '.deb'] }
+                  };
+                  
+                  function formatFileSize(bytes) {
+                      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                      if (bytes === 0) return '0 Bytes';
+                      const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+                      return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+                  }
+                  
+                  Object.keys(platformData).forEach(platform => {
+                      const platformAssets = assets.filter(asset => 
+                          asset.name.toLowerCase().includes(platform)
+                      );
+                      
+                      if (platformAssets.length > 0) {
+                          const card = document.createElement('div');
+                          card.className = 'download-card';
+                          
+                          let downloadButtons = '';
+                          platformAssets.forEach(asset => {
+                              downloadButtons += `
+                                  <a href="${asset.download_url}" class="download-btn">
+                                      ${asset.name}
+                                      <div class="file-size">${formatFileSize(asset.size)}</div>
+                                  </a>
+                              `;
+                          });
+                          
+                          card.innerHTML = `
+                              <div class="platform-icon">${platformData[platform].icon}</div>
+                              <h3>${platformData[platform].name}</h3>
+                              ${downloadButtons}
+                          `;
+                          
+                          downloadGrid.appendChild(card);
+                      }
+                  });
+              </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2

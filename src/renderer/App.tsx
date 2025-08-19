@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainPage from './pages/MainPage';
 import KeyManagerPage from './pages/KeyManagerPage';
+import UpdateNotification from './components/UpdateNotification';
 
 const { Content } = Layout;
 
@@ -23,6 +24,7 @@ const App: React.FC = () => {
           </Routes>
         </Content>
       </Layout>
+      <UpdateNotification />
     </Layout>
   );
 };

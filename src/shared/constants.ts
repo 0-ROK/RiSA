@@ -34,4 +34,8 @@ export const IPC_CHANNELS = {
   SELECT_FILE: 'select-file',
   EXPORT_KEY: 'export-key',
   IMPORT_KEY: 'import-key',
+  
+  // Auto updater
+  CHECK_FOR_UPDATES: 'check-for-updates',
+  RESTART_AND_INSTALL: 'restart-and-install',
 } as const;

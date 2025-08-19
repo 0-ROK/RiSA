@@ -32,6 +32,33 @@ const electronAPI = {
 
   importKey: (): Promise<SavedKey | null> => 
     ipcRenderer.invoke(IPC_CHANNELS.IMPORT_KEY),
+
+  // Auto updater
+  checkForUpdates: (): Promise<void> => 
+    ipcRenderer.invoke(IPC_CHANNELS.CHECK_FOR_UPDATES),
+
+  restartAndInstall: (): Promise<void> => 
+    ipcRenderer.invoke(IPC_CHANNELS.RESTART_AND_INSTALL),
+
+  // Update event listeners
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-available', (_event, info) => callback(info));
+  },
+
+  onDownloadProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('download-progress', (_event, progress) => callback(progress));
+  },
+
+  onUpdateDownloaded: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-downloaded', (_event, info) => callback(info));
+  },
+
+  // 이벤트 리스너 제거
+  removeUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update-available');
+    ipcRenderer.removeAllListeners('download-progress');
+    ipcRenderer.removeAllListeners('update-downloaded');
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import * as path from 'path';
 import Store from 'electron-store';
 import NodeRSA from 'node-rsa';
 import * as forge from 'node-forge';
 import * as fs from 'fs';
+import { autoUpdater } from 'electron-updater';
 import { SavedKey, RSAKeyPair, EncryptionResult } from '../shared/types';
 import { IPC_CHANNELS } from '../shared/constants';
 
@@ -42,7 +43,136 @@ const createWindow = (): void => {
   });
 };
 
-app.whenReady().then(createWindow);
+// Auto Updater 설정
+const setupAutoUpdater = (): void => {
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: '0-ROK',
+    repo: 'RiSA'
+  });
+
+  // 업데이트 확인
+  autoUpdater.checkForUpdatesAndNotify();
+
+  // 업데이트 이벤트 리스너
+  autoUpdater.on('checking-for-update', () => {
+    console.log('업데이트 확인 중...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('업데이트 사용 가능:', info);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', info);
+    }
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('최신 버전입니다:', info);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('업데이트 오류:', err);
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    let logMessage = `다운로드 속도: ${progressObj.bytesPerSecond}`;
+    logMessage = logMessage + ` - 다운로드 ${progressObj.percent}%`;
+    logMessage = logMessage + ` (${progressObj.transferred}/${progressObj.total})`;
+    console.log(logMessage);
+    
+    if (mainWindow) {
+      mainWindow.webContents.send('download-progress', progressObj);
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('업데이트 다운로드 완료:', info);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-downloaded', info);
+    }
+  });
+};
+
+// 메뉴 설정
+const setupMenu = (): void => {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'RiSA',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        {
+          label: '업데이트 확인',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify();
+          }
+        },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: '편집',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: '보기',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: '창',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' }
+      ]
+    }
+  ];
+
+  if (process.platform === 'darwin') {
+    // macOS에서는 첫 번째 메뉴를 앱 이름으로 설정
+    template[0].label = app.getName();
+    (template[0].submenu as Electron.MenuItemConstructorOptions[])[0] = { role: 'about', label: `${app.getName()} 정보` };
+    
+    // 창 메뉴에 macOS 특화 옵션 추가
+    (template[3].submenu as Electron.MenuItemConstructorOptions[]).push(
+      { type: 'separator' },
+      { role: 'front' }
+    );
+  }
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+};
+
+app.whenReady().then(() => {
+  createWindow();
+  
+  // Auto updater 설정
+  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
+    setupAutoUpdater();
+  }
+  
+  // 메뉴 설정
+  setupMenu();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -281,4 +411,13 @@ ipcMain.handle(IPC_CHANNELS.IMPORT_KEY, async (): Promise<SavedKey | null> => {
   }
   
   return null;
+});
+
+// Auto updater IPC handlers
+ipcMain.handle(IPC_CHANNELS.CHECK_FOR_UPDATES, () => {
+  autoUpdater.checkForUpdatesAndNotify();
+});
+
+ipcMain.handle(IPC_CHANNELS.RESTART_AND_INSTALL, () => {
+  autoUpdater.quitAndInstall();
 });
