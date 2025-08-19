@@ -23,7 +23,8 @@ import {
   CompressOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
-import { RSA_ALGORITHMS, DEFAULT_ENCRYPTION_OPTIONS, ALGORITHM_INFO } from '../../shared/constants';
+import { DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
+import AlgorithmSelector from '../components/AlgorithmSelector';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -269,31 +270,11 @@ const MainPage: React.FC = () => {
             <Col xs={24} md={8}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Text strong>암호화 알고리즘</Text>
-                <Select
-                  style={{ width: '100%' }}
-                  value={algorithm}
+                <AlgorithmSelector
+                  value={algorithm as 'RSA-OAEP' | 'RSA-PKCS1'}
                   onChange={setAlgorithm}
-                  optionLabelProp="label"
-                >
-                  {RSA_ALGORITHMS.map(algo => (
-                    <Select.Option 
-                      key={algo} 
-                      value={algo}
-                      label={`${ALGORITHM_INFO[algo].name}${ALGORITHM_INFO[algo].status === 'deprecated' ? ' (보안 경고)' : ' (권장)'}`}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>{ALGORITHM_INFO[algo].name}</div>
-                        <div style={{ 
-                          fontSize: '11px', 
-                          color: ALGORITHM_INFO[algo].status === 'deprecated' ? '#ff7875' : '#52c41a',
-                          marginTop: '2px'
-                        }}>
-                          {ALGORITHM_INFO[algo].description}
-                        </div>
-                      </div>
-                    </Select.Option>
-                  ))}
-                </Select>
+                  showWarning={false}
+                />
               </Space>
             </Col>
             

@@ -21,11 +21,13 @@ import {
   DeleteOutlined,
   EyeOutlined,
   EyeInvisibleOutlined,
-  ImportOutlined
+  ImportOutlined,
+  EditOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
 import { SavedKey } from '../../shared/types';
-import { RSA_KEY_SIZES, ALGORITHM_INFO } from '../../shared/constants';
+import { RSA_KEY_SIZES } from '../../shared/constants';
+import AlgorithmSelector from '../components/AlgorithmSelector';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -36,12 +38,16 @@ const KeyManagerPage: React.FC = () => {
   const [generateModalVisible, setGenerateModalVisible] = useState(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedKey, setSelectedKey] = useState<SavedKey | null>(null);
+  const [editingKey, setEditingKey] = useState<SavedKey | null>(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [form] = Form.useForm();
   const [importForm] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [selectedGenerateAlgorithm, setSelectedGenerateAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
   const [selectedImportAlgorithm, setSelectedImportAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
+  const [selectedEditAlgorithm, setSelectedEditAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
 
   const handleGenerateKey = async (values: { name: string; keySize: number; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
     setGenerateLoading(true);
@@ -74,6 +80,39 @@ const KeyManagerPage: React.FC = () => {
     setSelectedKey(key);
     setShowPrivateKey(false);
     setViewModalVisible(true);
+  };
+
+  const handleEditKey = (key: SavedKey) => {
+    setEditingKey(key);
+    setSelectedEditAlgorithm(key.preferredAlgorithm);
+    editForm.setFieldsValue({
+      name: key.name,
+      preferredAlgorithm: key.preferredAlgorithm
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleUpdateKey = async (values: { name: string; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
+    if (!editingKey) return;
+    
+    try {
+      const updatedKey: SavedKey = {
+        ...editingKey,
+        name: values.name.trim(),
+        preferredAlgorithm: values.preferredAlgorithm
+      };
+
+      await deleteKey(editingKey.id);
+      await saveKey(updatedKey);
+      
+      setEditModalVisible(false);
+      editForm.resetFields();
+      setEditingKey(null);
+      message.success(`"${values.name}" 키가 수정되었습니다.`);
+    } catch (error) {
+      message.error('키 수정 중 오류가 발생했습니다.');
+      console.error(error);
+    }
   };
 
   const handleCopyKey = async (keyData: string, keyType: 'public' | 'private') => {
@@ -271,7 +310,7 @@ const KeyManagerPage: React.FC = () => {
     {
       title: '작업',
       key: 'actions',
-      width: 150,
+      width: 180,
       render: (_: any, record: SavedKey) => (
         <Space size="small">
           <Tooltip title="키 보기">
@@ -279,6 +318,14 @@ const KeyManagerPage: React.FC = () => {
               icon={<EyeOutlined />} 
               size="small"
               onClick={() => handleViewKey(record)}
+            />
+          </Tooltip>
+
+          <Tooltip title="키 편집">
+            <Button 
+              icon={<EditOutlined />} 
+              size="small"
+              onClick={() => handleEditKey(record)}
             />
           </Tooltip>
           
@@ -414,27 +461,13 @@ const KeyManagerPage: React.FC = () => {
               rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
               tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
             >
-              <Select onChange={setSelectedGenerateAlgorithm}>
-                <Select.Option value="RSA-OAEP">
-                  <div>
-                    <div>{ALGORITHM_INFO['RSA-OAEP'].name}</div>
-                    <div style={{ fontSize: '11px', color: '#52c41a', marginTop: '2px' }}>
-                      {ALGORITHM_INFO['RSA-OAEP'].description}
-                    </div>
-                  </div>
-                </Select.Option>
-                <Select.Option value="RSA-PKCS1">
-                  <div>
-                    <div>{ALGORITHM_INFO['RSA-PKCS1'].name}</div>
-                    <div style={{ fontSize: '11px', color: '#ff7875', marginTop: '2px' }}>
-                      {ALGORITHM_INFO['RSA-PKCS1'].description}
-                    </div>
-                  </div>
-                </Select.Option>
-              </Select>
+              <AlgorithmSelector
+                onInternalChange={setSelectedGenerateAlgorithm}
+                showWarning={false}
+              />
             </Form.Item>
 
-            {/* PKCS1 보안 경고 */}
+            {/* PKCS1 보안 경고를 Form.Item 밖으로 이동 */}
             {selectedGenerateAlgorithm === 'RSA-PKCS1' && (
               <Alert
                 message="보안 알림"
@@ -502,27 +535,13 @@ const KeyManagerPage: React.FC = () => {
               rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
               tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
             >
-              <Select onChange={setSelectedImportAlgorithm}>
-                <Select.Option value="RSA-OAEP">
-                  <div>
-                    <div>{ALGORITHM_INFO['RSA-OAEP'].name}</div>
-                    <div style={{ fontSize: '11px', color: '#52c41a', marginTop: '2px' }}>
-                      {ALGORITHM_INFO['RSA-OAEP'].description}
-                    </div>
-                  </div>
-                </Select.Option>
-                <Select.Option value="RSA-PKCS1">
-                  <div>
-                    <div>{ALGORITHM_INFO['RSA-PKCS1'].name}</div>
-                    <div style={{ fontSize: '11px', color: '#ff7875', marginTop: '2px' }}>
-                      {ALGORITHM_INFO['RSA-PKCS1'].description}
-                    </div>
-                  </div>
-                </Select.Option>
-              </Select>
+              <AlgorithmSelector
+                onInternalChange={setSelectedImportAlgorithm}
+                showWarning={false}
+              />
             </Form.Item>
 
-            {/* PKCS1 보안 경고 */}
+            {/* PKCS1 보안 경고를 Form.Item 밖으로 이동 */}
             {selectedImportAlgorithm === 'RSA-PKCS1' && (
               <Alert
                 message="보안 알림"
@@ -713,6 +732,93 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
               </div>
             </Space>
           )}
+        </Modal>
+
+        {/* 키 편집 모달 */}
+        <Modal
+          title={`키 편집: ${editingKey?.name}`}
+          open={editModalVisible}
+          onCancel={() => {
+            setEditModalVisible(false);
+            editForm.resetFields();
+            setEditingKey(null);
+          }}
+          footer={null}
+          width={600}
+        >
+          <Form
+            form={editForm}
+            layout="vertical"
+            onFinish={handleUpdateKey}
+            initialValues={{ preferredAlgorithm: 'RSA-OAEP' }}
+          >
+            <Form.Item
+              label="키 이름"
+              name="name"
+              rules={[
+                { required: true, message: '키 이름을 입력해주세요.' },
+                { min: 1, max: 50, message: '키 이름은 1-50자 사이여야 합니다.' },
+              ]}
+              tooltip="키를 식별할 수 있는 이름을 입력하세요."
+            >
+              <Input 
+                placeholder="예: MyPersonalKey, WorkKey, TestKey..."
+                autoFocus
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="선호 암호화 알고리즘"
+              name="preferredAlgorithm"
+              rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
+              tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
+            >
+              <AlgorithmSelector
+                onInternalChange={setSelectedEditAlgorithm}
+                showWarning={false}
+              />
+            </Form.Item>
+
+            {/* PKCS1 보안 경고를 Form.Item 밖으로 이동 */}
+            {selectedEditAlgorithm === 'RSA-PKCS1' && (
+              <Alert
+                message="보안 알림"
+                description="RSA-PKCS1 패딩은 보안상 지원되지 않아 OAEP 패딩이 대신 사용됩니다."
+                type="warning"
+                showIcon
+                style={{ marginBottom: '16px' }}
+              />
+            )}
+
+            {editingKey && (
+              <div style={{ 
+                padding: '12px', 
+                backgroundColor: '#f0f8ff', 
+                borderRadius: '4px',
+                marginBottom: '16px',
+                border: '1px solid #d1ecf1'
+              }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  <strong>현재 키 정보:</strong>
+                  <br />• 키 크기: {editingKey.keySize} bits
+                  <br />• 생성일: {new Date(editingKey.created).toLocaleDateString('ko-KR')}
+                  <br />• 키 내용은 보안상 수정할 수 없습니다
+                </Text>
+              </div>
+            )}
+
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setEditModalVisible(false)}>
+                취소
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit"
+              >
+                수정
+              </Button>
+            </Space>
+          </Form>
         </Modal>
       </div>
     </div>
