@@ -12,7 +12,8 @@ import {
   Form,
   Popconfirm,
   Tooltip,
-  Alert
+  Alert,
+  notification
 } from 'antd';
 import { 
   KeyOutlined, 
@@ -22,7 +23,9 @@ import {
   EyeOutlined,
   EyeInvisibleOutlined,
   ImportOutlined,
-  EditOutlined
+  EditOutlined,
+  CheckOutlined,
+  CloseCircleOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
 import { SavedKey } from '../../shared/types';
@@ -115,12 +118,31 @@ const KeyManagerPage: React.FC = () => {
     }
   };
 
-  const handleCopyKey = async (keyData: string, keyType: 'public' | 'private') => {
+  const handleCopyKey = async (keyData: string, keyType: 'public' | 'private', keyName?: string) => {
     try {
       await navigator.clipboard.writeText(keyData);
-      message.success(`${keyType === 'public' ? '공개' : '개인'}키가 클립보드에 복사되었습니다.`);
+      
+      const size = keyData.length;
+      const sizeText = size > 1000 ? `${Math.round(size/1000)}KB` : `${size}자`;
+      const keyTypeName = keyType === 'public' ? '공개키' : '개인키';
+      const keyDisplayName = keyName ? ` (${keyName})` : '';
+      
+      notification.success({
+        message: `${keyTypeName} 복사됨`,
+        description: `${sizeText}의 ${keyTypeName} 데이터${keyDisplayName}가 클립보드에 복사되었습니다.`,
+        icon: <CheckOutlined style={{ color: '#52c41a' }} />,
+        placement: 'topRight',
+        duration: 3,
+      });
+      
     } catch (error) {
-      message.error('복사 중 오류가 발생했습니다.');
+      notification.error({
+        message: '복사 실패',
+        description: '클립보드에 복사하는 중 오류가 발생했습니다. 브라우저 권한을 확인해주세요.',
+        icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+        placement: 'topRight',
+        duration: 4,
+      });
     }
   };
 
@@ -333,7 +355,7 @@ const KeyManagerPage: React.FC = () => {
             <Button 
               icon={<CopyOutlined />} 
               size="small"
-              onClick={() => handleCopyKey(record.publicKey, 'public')}
+              onClick={() => handleCopyKey(record.publicKey, 'public', record.name)}
             />
           </Tooltip>
           
@@ -673,7 +695,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
                   <Button 
                     size="small"
                     icon={<CopyOutlined />}
-                    onClick={() => handleCopyKey(selectedKey.publicKey, 'public')}
+                    onClick={() => handleCopyKey(selectedKey.publicKey, 'public', selectedKey.name)}
                   >
                     복사
                   </Button>
@@ -701,7 +723,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
                       <Button 
                         size="small"
                         icon={<CopyOutlined />}
-                        onClick={() => handleCopyKey(selectedKey.privateKey, 'private')}
+                        onClick={() => handleCopyKey(selectedKey.privateKey, 'private', selectedKey.name)}
                       >
                         복사
                       </Button>

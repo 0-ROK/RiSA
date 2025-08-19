@@ -11,7 +11,8 @@ import {
   Col,
   Select,
   Alert,
-  Modal
+  Modal,
+  notification
 } from 'antd';
 import { 
   LockOutlined, 
@@ -20,7 +21,10 @@ import {
   ClearOutlined,
   KeyOutlined,
   ExpandOutlined,
-  CompressOutlined
+  CompressOutlined,
+  CheckOutlined,
+  ExclamationCircleOutlined,
+  CloseCircleOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
 import { DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
@@ -43,6 +47,9 @@ const MainPage: React.FC = () => {
   const [fullScreenType, setFullScreenType] = useState<'encrypt' | 'decrypt' | 'result'>('encrypt');
   const [fullScreenContent, setFullScreenContent] = useState('');
   const [activeTab, setActiveTab] = useState('encrypt');
+  const [encryptionStatus, setEncryptionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [decryptionStatus, setDecryptionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [lastError, setLastError] = useState<string>('');
 
   // 선택된 키가 변경될 때마다 selectedKey 업데이트 및 알고리즘 자동 설정
   useEffect(() => {
@@ -71,6 +78,7 @@ const MainPage: React.FC = () => {
     }
 
     setLoading(true);
+    setEncryptionStatus('idle');
     try {
       const result = await window.electronAPI.encryptText(
         encryptText, 
@@ -78,9 +86,20 @@ const MainPage: React.FC = () => {
         algorithm
       );
       setEncryptedResult(result.data);
+      setEncryptionStatus('success');
       message.success('암호화가 완료되었습니다.');
     } catch (error) {
-      message.error('암호화 중 오류가 발생했습니다.');
+      setEncryptionStatus('error');
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      setLastError(errorMessage);
+      
+      notification.error({
+        message: '암호화 실패',
+        description: `암호화 중 오류가 발생했습니다: ${errorMessage}`,
+        icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+        placement: 'topRight',
+        duration: 5,
+      });
       console.error('Encryption error:', error);
     } finally {
       setLoading(false);
@@ -103,6 +122,7 @@ const MainPage: React.FC = () => {
     }
 
     setLoading(true);
+    setDecryptionStatus('idle');
     try {
       const result = await window.electronAPI.decryptText(
         decryptText, 
@@ -110,21 +130,87 @@ const MainPage: React.FC = () => {
         algorithm
       );
       setDecryptedResult(result);
+      setDecryptionStatus('success');
       message.success('복호화가 완료되었습니다.');
     } catch (error) {
-      message.error('복호화 중 오류가 발생했습니다. 키와 텍스트를 확인해주세요.');
+      setDecryptionStatus('error');
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      setLastError(errorMessage);
+      
+      // 오류 타입에 따른 구체적인 가이드 제공
+      let helpText = '';
+      if (errorMessage.includes('키')) {
+        helpText = '사용 중인 키가 올바른지 확인해주세요. 암호화할 때 사용한 키와 동일한 키 쌍을 사용해야 합니다.';
+      } else if (errorMessage.includes('알고리즘')) {
+        helpText = '암호화할 때 사용한 알고리즘과 동일한 알고리즘을 선택해주세요.';
+      } else if (errorMessage.includes('형식')) {
+        helpText = '입력한 암호화 데이터가 올바른 형식인지 확인해주세요.';
+      } else {
+        helpText = '암호화 데이터, 키, 그리고 알고리즘이 모두 일치하는지 확인해주세요.';
+      }
+      
+      notification.error({
+        message: '복호화 실패',
+        description: (
+          <div>
+            <div style={{ marginBottom: 8 }}><strong>오류:</strong> {errorMessage}</div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              <ExclamationCircleOutlined style={{ marginRight: 4 }} />
+              {helpText}
+            </div>
+          </div>
+        ),
+        icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+        placement: 'topRight',
+        duration: 8,
+      });
       console.error('Decryption error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = async (text: string) => {
+  const handleCopy = async (text: string, type?: 'encrypted' | 'decrypted' | 'key') => {
     try {
       await navigator.clipboard.writeText(text);
-      message.success('클립보드에 복사되었습니다.');
+      
+      // 복사된 내용의 종류와 크기에 따른 맞춤 알림
+      const size = text.length;
+      const sizeText = size > 1000 ? `${Math.round(size/1000)}KB` : `${size}자`;
+      
+      let description = '';
+      let title = '';
+      
+      if (type === 'encrypted') {
+        title = '암호화 결과 복사됨';
+        description = `${sizeText}의 암호화된 데이터가 클립보드에 복사되었습니다.`;
+      } else if (type === 'decrypted') {
+        title = '복호화 결과 복사됨';
+        description = `${sizeText}의 복호화된 텍스트가 클립보드에 복사되었습니다.`;
+      } else if (type === 'key') {
+        title = '키 데이터 복사됨';
+        description = `${sizeText}의 키 데이터가 클립보드에 복사되었습니다.`;
+      } else {
+        title = '클립보드에 복사됨';
+        description = `${sizeText}의 데이터가 복사되었습니다.`;
+      }
+      
+      notification.success({
+        message: title,
+        description,
+        icon: <CheckOutlined style={{ color: '#52c41a' }} />,
+        placement: 'topRight',
+        duration: 3,
+      });
+      
     } catch (error) {
-      message.error('복사 중 오류가 발생했습니다.');
+      notification.error({
+        message: '복사 실패',
+        description: '클립보드에 복사하는 중 오류가 발생했습니다. 브라우저 권한을 확인해주세요.',
+        icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+        placement: 'topRight',
+        duration: 4,
+      });
     }
   };
 
@@ -132,10 +218,13 @@ const MainPage: React.FC = () => {
     if (type === 'encrypt') {
       setEncryptText('');
       setEncryptedResult('');
+      setEncryptionStatus('idle');
     } else {
       setDecryptText('');
       setDecryptedResult('');
+      setDecryptionStatus('idle');
     }
+    setLastError('');
   };
 
   const handleFullScreenEdit = (type: 'encrypt' | 'decrypt' | 'result') => {
@@ -160,6 +249,37 @@ const MainPage: React.FC = () => {
 
   const getCharacterCount = (text: string) => {
     return `${text.length} 문자`;
+  };
+
+  // 결과 영역 상태별 스타일 반환
+  const getResultAreaStyle = (status: 'idle' | 'success' | 'error') => {
+    const baseStyle = {
+      flex: 1,
+      fontFamily: 'monospace',
+      backgroundColor: '#f5f5f5',
+      resize: 'none' as const,
+      maxHeight: 'calc(100vh - 450px)',
+      overflowY: 'auto' as const,
+      transition: 'all 0.3s ease'
+    };
+
+    if (status === 'success') {
+      return {
+        ...baseStyle,
+        border: '2px solid #52c41a',
+        backgroundColor: '#f6ffed',
+        boxShadow: '0 0 0 2px rgba(82, 196, 26, 0.2)',
+      };
+    } else if (status === 'error') {
+      return {
+        ...baseStyle,
+        border: '2px solid #ff4d4f',
+        backgroundColor: '#fff2f0',
+        boxShadow: '0 0 0 2px rgba(255, 77, 79, 0.2)',
+      };
+    }
+
+    return baseStyle;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, type: 'encrypt' | 'decrypt') => {
@@ -424,8 +544,8 @@ const MainPage: React.FC = () => {
                                     <Button
                                       size="small"
                                       icon={<CopyOutlined />}
-                                      onClick={() => handleCopy(encryptedResult)}
-                                      title="클립보드에 복사"
+                                      onClick={() => handleCopy(encryptedResult, 'encrypted')}
+                                      title="암호화 결과 복사"
                                     />
                                   </>
                                 )}
@@ -434,14 +554,7 @@ const MainPage: React.FC = () => {
                             <TextArea
                               value={encryptedResult}
                               readOnly
-                              style={{ 
-                                flex: 1,
-                                fontFamily: 'monospace',
-                                backgroundColor: '#f5f5f5',
-                                resize: 'none',
-                                maxHeight: 'calc(100vh - 450px)',
-                                overflowY: 'auto'
-                              }}
+                              style={getResultAreaStyle(encryptionStatus)}
                             />
                           </div>
                         </Card>
@@ -541,8 +654,8 @@ const MainPage: React.FC = () => {
                                     <Button
                                       size="small"
                                       icon={<CopyOutlined />}
-                                      onClick={() => handleCopy(decryptedResult)}
-                                      title="클립보드에 복사"
+                                      onClick={() => handleCopy(decryptedResult, 'decrypted')}
+                                      title="복호화 결과 복사"
                                     />
                                   </>
                                 )}
@@ -551,13 +664,7 @@ const MainPage: React.FC = () => {
                             <TextArea
                               value={decryptedResult}
                               readOnly
-                              style={{ 
-                                flex: 1,
-                                backgroundColor: '#f5f5f5',
-                                resize: 'none',
-                                maxHeight: 'calc(100vh - 450px)',
-                                overflowY: 'auto'
-                              }}
+                              style={getResultAreaStyle(decryptionStatus)}
                             />
                           </div>
                         </Card>
@@ -595,7 +702,10 @@ const MainPage: React.FC = () => {
               저장
             </Button>
           ] : [
-            <Button key="copy" icon={<CopyOutlined />} onClick={() => handleCopy(fullScreenContent)}>
+            <Button key="copy" icon={<CopyOutlined />} onClick={() => {
+              const type = activeTab === 'encrypt' ? 'encrypted' : 'decrypted';
+              handleCopy(fullScreenContent, type);
+            }}>
               복사
             </Button>,
             <Button key="close" onClick={() => setFullScreenModalVisible(false)}>
