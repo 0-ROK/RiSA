@@ -379,7 +379,7 @@ const MainPage: React.FC = () => {
       fontFamily: 'monospace',
       backgroundColor: '#f5f5f5',
       resize: 'none' as const,
-      maxHeight: 'calc(100vh - 450px)',
+      maxHeight: 'calc(100vh - 400px)', // 입력 영역과 동일한 높이
       overflowY: 'auto' as const,
       transition: 'all 0.3s ease'
     };
@@ -671,7 +671,8 @@ const MainPage: React.FC = () => {
                                       size="small"
                                       icon={<CopyOutlined />}
                                       onClick={() => handleCopy(encryptedResult, 'encrypted')}
-                                      title="암호화 결과 복사"
+                                      disabled={encryptionStatus === 'error'}
+                                      title={encryptionStatus === 'error' ? "오류가 발생했습니다" : "암호화 결과 복사"}
                                     />
                                   </>
                                 )}
@@ -781,7 +782,8 @@ const MainPage: React.FC = () => {
                                       size="small"
                                       icon={<CopyOutlined />}
                                       onClick={() => handleCopy(decryptedResult, 'decrypted')}
-                                      title="복호화 결과 복사"
+                                      disabled={decryptionStatus === 'error'}
+                                      title={decryptionStatus === 'error' ? "오류가 발생했습니다" : "복호화 결과 복사"}
                                     />
                                   </>
                                 )}
@@ -828,10 +830,24 @@ const MainPage: React.FC = () => {
               저장
             </Button>
           ] : [
-            <Button key="copy" icon={<CopyOutlined />} onClick={() => {
-              const type = activeTab === 'encrypt' ? 'encrypted' : 'decrypted';
-              handleCopy(fullScreenContent, type);
-            }}>
+            <Button 
+              key="copy" 
+              icon={<CopyOutlined />} 
+              onClick={() => {
+                const type = activeTab === 'encrypt' ? 'encrypted' : 'decrypted';
+                handleCopy(fullScreenContent, type);
+              }}
+              disabled={
+                (activeTab === 'encrypt' && encryptionStatus === 'error') ||
+                (activeTab === 'decrypt' && decryptionStatus === 'error')
+              }
+              title={
+                ((activeTab === 'encrypt' && encryptionStatus === 'error') ||
+                 (activeTab === 'decrypt' && decryptionStatus === 'error'))
+                  ? "오류가 발생했습니다"
+                  : "복사"
+              }
+            >
               복사
             </Button>,
             <Button key="close" onClick={() => setFullScreenModalVisible(false)}>
