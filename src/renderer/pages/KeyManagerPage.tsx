@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Layout, 
   Card, 
   Button, 
   Table, 
@@ -27,7 +26,6 @@ import { useSettings } from '../store/SettingsContext';
 import { RSAKeyPair } from '../../shared/types';
 import { RSA_KEY_SIZES } from '../../shared/constants';
 
-const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -162,7 +160,7 @@ const KeyManagerPage: React.FC = () => {
   ];
 
   return (
-    <Content style={{ padding: '24px', background: '#f0f2f5' }}>
+    <div style={{ padding: '24px', minHeight: '100%' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ 
           display: 'flex', 
@@ -332,7 +330,7 @@ const KeyManagerPage: React.FC = () => {
           )}
         </Modal>
       </div>
-    </Content>
+    </div>
   );
 };
 

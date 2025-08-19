@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Layout, 
   Card, 
   Form, 
   Select, 
@@ -30,7 +29,6 @@ import {
   ENVIRONMENTS 
 } from '../../shared/constants';
 
-const { Content } = Layout;
 const { Title, Text } = Typography;
 
 const SettingsPage: React.FC = () => {
@@ -96,7 +94,7 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <Content style={{ padding: '24px', background: '#f0f2f5' }}>
+    <div style={{ padding: '24px', minHeight: '100%' }}>
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
         <Title level={2}>
           <SettingOutlined style={{ marginRight: 8 }} />
@@ -287,7 +285,7 @@ const SettingsPage: React.FC = () => {
           </Space>
         </Form>
       </div>
-    </Content>
+    </div>
   );
 };
 

@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  Layout, 
   Card, 
   Tabs, 
   Input, 
   Button, 
-  Select, 
   Space, 
   Typography, 
   message,
@@ -19,7 +17,6 @@ import {
   ClearOutlined
 } from '@ant-design/icons';
 
-const { Content } = Layout;
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -93,7 +90,7 @@ const MainPage: React.FC = () => {
   };
 
   return (
-    <Content style={{ padding: '24px', background: '#f0f2f5' }}>
+    <div style={{ padding: '24px', minHeight: '100%' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <Title level={2}>RSA 암호화/복호화</Title>
         
@@ -271,7 +268,7 @@ const MainPage: React.FC = () => {
           </TabPane>
         </Tabs>
       </div>
-    </Content>
+    </div>
   );
 };
 

@@ -13,13 +13,13 @@ const App: React.FC = () => {
   const { settings } = useSettings();
 
   return (
-    <Layout style={{ height: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       <Sidebar />
-      <Layout>
+      <Layout style={{ height: '100vh', overflow: 'hidden' }}>
         <Content style={{ 
-          margin: 0, 
-          padding: 0,
-          backgroundColor: settings.theme === 'dark' ? '#141414' : '#ffffff'
+          height: '100vh',
+          overflow: 'auto',
+          backgroundColor: settings.theme === 'dark' ? '#141414' : '#f0f2f5'
         }}>
           <Routes>
             <Route path="/" element={<MainPage />} />
