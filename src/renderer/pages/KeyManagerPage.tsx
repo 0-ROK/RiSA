@@ -40,7 +40,7 @@ const KeyManagerPage: React.FC = () => {
   const [form] = Form.useForm();
   const [importForm] = Form.useForm();
 
-  const handleGenerateKey = async (values: { name: string; keySize: number }) => {
+  const handleGenerateKey = async (values: { name: string; keySize: number; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
     setGenerateLoading(true);
     try {
       const keyPair = await window.electronAPI.generateRSAKeys(values.keySize);
@@ -51,6 +51,7 @@ const KeyManagerPage: React.FC = () => {
         publicKey: keyPair.publicKey,
         privateKey: keyPair.privateKey,
         keySize: values.keySize,
+        preferredAlgorithm: values.preferredAlgorithm,
         created: new Date(),
       };
 
@@ -112,44 +113,75 @@ const KeyManagerPage: React.FC = () => {
     return `Imported_Key_${timestamp}`;
   };
 
-  // RSA 키 검증 함수
-  const validateRSAKey = (key: string, keyType: 'public' | 'private'): boolean => {
+  // Base64 문자열 검증 함수
+  const isValidBase64 = (str: string): boolean => {
     try {
-      const expectedHeader = keyType === 'public' ? '-----BEGIN PUBLIC KEY-----' : '-----BEGIN PRIVATE KEY-----';
-      const expectedFooter = keyType === 'public' ? '-----END PUBLIC KEY-----' : '-----END PRIVATE KEY-----';
-      
+      // Base64 패턴 검증
+      const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
+      const cleanStr = str.replace(/\s/g, '');
+      return base64Pattern.test(cleanStr) && cleanStr.length > 100;
+    } catch {
+      return false;
+    }
+  };
+
+  // PEM 형식 자동 생성 함수
+  const formatToPEM = (keyContent: string, keyType: 'public' | 'private'): string => {
+    const cleanContent = keyContent.replace(/\s/g, '');
+    const header = keyType === 'public' ? '-----BEGIN PUBLIC KEY-----' : '-----BEGIN PRIVATE KEY-----';
+    const footer = keyType === 'public' ? '-----END PUBLIC KEY-----' : '-----END PRIVATE KEY-----';
+    
+    // 64자마다 줄바꿈 추가
+    const formattedContent = cleanContent.match(/.{1,64}/g)?.join('\n') || cleanContent;
+    
+    return `${header}\n${formattedContent}\n${footer}`;
+  };
+
+  // RSA 키 검증 및 정규화 함수
+  const validateAndNormalizeRSAKey = (key: string, keyType: 'public' | 'private'): { isValid: boolean; normalizedKey: string } => {
+    try {
       const trimmedKey = key.trim();
       
-      // RSA 키 또는 RSA PUBLIC/PRIVATE KEY 형식 지원
-      const isValidFormat = (
+      // 이미 PEM 형식인지 확인
+      const hasPEMFormat = (
         (trimmedKey.includes('-----BEGIN PUBLIC KEY-----') && trimmedKey.includes('-----END PUBLIC KEY-----')) ||
         (trimmedKey.includes('-----BEGIN PRIVATE KEY-----') && trimmedKey.includes('-----END PRIVATE KEY-----')) ||
         (trimmedKey.includes('-----BEGIN RSA PUBLIC KEY-----') && trimmedKey.includes('-----END RSA PUBLIC KEY-----')) ||
         (trimmedKey.includes('-----BEGIN RSA PRIVATE KEY-----') && trimmedKey.includes('-----END RSA PRIVATE KEY-----'))
       );
       
-      if (!isValidFormat) return false;
+      if (hasPEMFormat) {
+        // 기존 PEM 형식 검증
+        const keyContent = trimmedKey.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+        if (isValidBase64(keyContent)) {
+          return { isValid: true, normalizedKey: trimmedKey };
+        }
+      } else {
+        // Base64 문자열만 있는 경우
+        if (isValidBase64(trimmedKey)) {
+          const normalizedKey = formatToPEM(trimmedKey, keyType);
+          return { isValid: true, normalizedKey };
+        }
+      }
       
-      // Base64 내용 검증
-      const keyContent = trimmedKey.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
-      if (keyContent.length < 100) return false; // 너무 짧은 키는 유효하지 않음
-      
-      return true;
+      return { isValid: false, normalizedKey: '' };
     } catch {
-      return false;
+      return { isValid: false, normalizedKey: '' };
     }
   };
 
-  const handleImportKey = async (values: { name?: string; publicKey: string; privateKey: string }) => {
+  const handleImportKey = async (values: { name?: string; publicKey: string; privateKey: string; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
     try {
-      // 키 검증
-      if (!validateRSAKey(values.publicKey, 'public')) {
-        message.error('유효하지 않은 공개키 형식입니다.');
+      // 키 검증 및 정규화
+      const publicKeyResult = validateAndNormalizeRSAKey(values.publicKey, 'public');
+      if (!publicKeyResult.isValid) {
+        message.error('유효하지 않은 공개키 형식입니다. PEM 형식이거나 Base64 문자열을 입력해주세요.');
         return;
       }
       
-      if (!validateRSAKey(values.privateKey, 'private')) {
-        message.error('유효하지 않은 개인키 형식입니다.');
+      const privateKeyResult = validateAndNormalizeRSAKey(values.privateKey, 'private');
+      if (!privateKeyResult.isValid) {
+        message.error('유효하지 않은 개인키 형식입니다. PEM 형식이거나 Base64 문자열을 입력해주세요.');
         return;
       }
       
@@ -157,14 +189,15 @@ const KeyManagerPage: React.FC = () => {
       const keyName = values.name?.trim() || generateAutoName();
       
       // 키 크기 감지
-      const keySize = detectKeySize(values.publicKey);
+      const keySize = detectKeySize(publicKeyResult.normalizedKey);
       
       const savedKey: SavedKey = {
         id: crypto.randomUUID(),
         name: keyName,
-        publicKey: values.publicKey.trim(),
-        privateKey: values.privateKey.trim(),
+        publicKey: publicKeyResult.normalizedKey,
+        privateKey: privateKeyResult.normalizedKey,
         keySize,
+        preferredAlgorithm: values.preferredAlgorithm,
         created: new Date(),
       };
 
@@ -196,6 +229,17 @@ const KeyManagerPage: React.FC = () => {
       key: 'keySize',
       render: (size: number) => `${size} bits`,
       width: 100,
+    },
+    {
+      title: '선호 알고리즘',
+      dataIndex: 'preferredAlgorithm',
+      key: 'preferredAlgorithm',
+      render: (algorithm: string) => (
+        <Text style={{ fontSize: '12px', color: '#666' }}>
+          {algorithm}
+        </Text>
+      ),
+      width: 120,
     },
     {
       title: '생성 일시',
@@ -329,7 +373,7 @@ const KeyManagerPage: React.FC = () => {
             form={form}
             layout="vertical"
             onFinish={handleGenerateKey}
-            initialValues={{ keySize: 2048 }}
+            initialValues={{ keySize: 2048, preferredAlgorithm: 'RSA-OAEP' }}
           >
             <Form.Item
               label="키 이름"
@@ -361,6 +405,18 @@ const KeyManagerPage: React.FC = () => {
               </Select>
             </Form.Item>
 
+            <Form.Item
+              label="선호 암호화 알고리즘"
+              name="preferredAlgorithm"
+              rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
+              tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
+            >
+              <Select>
+                <Select.Option value="RSA-OAEP">RSA-OAEP (권장)</Select.Option>
+                <Select.Option value="RSA-PKCS1">RSA-PKCS1</Select.Option>
+              </Select>
+            </Form.Item>
+
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
               <Button onClick={() => setGenerateModalVisible(false)}>
                 취소
@@ -386,11 +442,18 @@ const KeyManagerPage: React.FC = () => {
           }}
           footer={null}
           width={800}
+          style={{ top: 20 }}
+          bodyStyle={{ 
+            maxHeight: 'calc(100vh - 200px)', 
+            overflowY: 'auto',
+            padding: '24px'
+          }}
         >
           <Form
             form={importForm}
             layout="vertical"
             onFinish={handleImportKey}
+            initialValues={{ preferredAlgorithm: 'RSA-OAEP' }}
           >
             <Form.Item
               label="키 이름 (선택사항)"
@@ -406,6 +469,18 @@ const KeyManagerPage: React.FC = () => {
             </Form.Item>
 
             <Form.Item
+              label="선호 암호화 알고리즘"
+              name="preferredAlgorithm"
+              rules={[{ required: true, message: '알고리즘을 선택해주세요.' }]}
+              tooltip="이 키와 함께 사용할 기본 암호화 알고리즘을 선택하세요."
+            >
+              <Select>
+                <Select.Option value="RSA-OAEP">RSA-OAEP (권장)</Select.Option>
+                <Select.Option value="RSA-PKCS1">RSA-PKCS1</Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
               label="공개키 (Public Key)"
               name="publicKey"
               rules={[
@@ -413,20 +488,25 @@ const KeyManagerPage: React.FC = () => {
                 { 
                   validator: (_, value) => {
                     if (!value) return Promise.resolve();
-                    if (!validateRSAKey(value, 'public')) {
-                      return Promise.reject(new Error('유효하지 않은 공개키 형식입니다. PEM 형식의 RSA 공개키를 입력해주세요.'));
+                    const result = validateAndNormalizeRSAKey(value, 'public');
+                    if (!result.isValid) {
+                      return Promise.reject(new Error('유효하지 않은 공개키 형식입니다. PEM 형식이거나 Base64 문자열을 입력해주세요.'));
                     }
                     return Promise.resolve();
                   }
                 }
               ]}
-              tooltip="-----BEGIN PUBLIC KEY----- 로 시작하는 PEM 형식의 RSA 공개키를 입력하세요."
+              tooltip="PEM 형식의 RSA 공개키 또는 Base64 문자열을 입력하세요."
             >
               <TextArea
-                placeholder="-----BEGIN PUBLIC KEY-----
+                placeholder="PEM 형식:
+-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
------END PUBLIC KEY-----"
-                rows={8}
+-----END PUBLIC KEY-----
+
+또는 Base64 문자열:
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+                rows={6}
                 style={{ fontFamily: 'monospace', fontSize: '12px' }}
               />
             </Form.Item>
@@ -439,20 +519,25 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
                 { 
                   validator: (_, value) => {
                     if (!value) return Promise.resolve();
-                    if (!validateRSAKey(value, 'private')) {
-                      return Promise.reject(new Error('유효하지 않은 개인키 형식입니다. PEM 형식의 RSA 개인키를 입력해주세요.'));
+                    const result = validateAndNormalizeRSAKey(value, 'private');
+                    if (!result.isValid) {
+                      return Promise.reject(new Error('유효하지 않은 개인키 형식입니다. PEM 형식이거나 Base64 문자열을 입력해주세요.'));
                     }
                     return Promise.resolve();
                   }
                 }
               ]}
-              tooltip="-----BEGIN PRIVATE KEY----- 로 시작하는 PEM 형식의 RSA 개인키를 입력하세요."
+              tooltip="PEM 형식의 RSA 개인키 또는 Base64 문자열을 입력하세요."
             >
               <TextArea
-                placeholder="-----BEGIN PRIVATE KEY-----
+                placeholder="PEM 형식:
+-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
------END PRIVATE KEY-----"
-                rows={12}
+-----END PRIVATE KEY-----
+
+또는 Base64 문자열:
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
+                rows={8}
                 style={{ fontFamily: 'monospace', fontSize: '12px' }}
               />
             </Form.Item>
@@ -496,6 +581,12 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
             setShowPrivateKey(false);
           }}
           width={800}
+          style={{ top: 20 }}
+          bodyStyle={{ 
+            maxHeight: 'calc(100vh - 200px)', 
+            overflowY: 'auto',
+            padding: '24px'
+          }}
           footer={[
             <Button key="close" onClick={() => setViewModalVisible(false)}>
               닫기

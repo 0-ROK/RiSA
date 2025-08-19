@@ -10,14 +10,17 @@ import {
   Row,
   Col,
   Select,
-  Alert
+  Alert,
+  Modal
 } from 'antd';
 import { 
   LockOutlined, 
   UnlockOutlined, 
   CopyOutlined,
   ClearOutlined,
-  KeyOutlined
+  KeyOutlined,
+  ExpandOutlined,
+  CompressOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
 import { RSA_ALGORITHMS, DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
@@ -35,11 +38,19 @@ const MainPage: React.FC = () => {
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
   const [algorithm, setAlgorithm] = useState<string>(DEFAULT_ENCRYPTION_OPTIONS.algorithm);
   const [loading, setLoading] = useState(false);
+  const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
+  const [fullScreenType, setFullScreenType] = useState<'encrypt' | 'decrypt' | 'result'>('encrypt');
+  const [fullScreenContent, setFullScreenContent] = useState('');
 
-  // 선택된 키가 변경될 때마다 selectedKey 업데이트
+  // 선택된 키가 변경될 때마다 selectedKey 업데이트 및 알고리즘 자동 설정
   useEffect(() => {
     const key = keys.find(k => k.id === selectedKeyId);
     selectKey(key || null);
+    
+    // 키의 선호 알고리즘이 있으면 자동 설정
+    if (key && key.preferredAlgorithm) {
+      setAlgorithm(key.preferredAlgorithm);
+    }
   }, [selectedKeyId, keys, selectKey]);
 
   const handleEncrypt = async () => {
@@ -115,6 +126,30 @@ const MainPage: React.FC = () => {
       setDecryptText('');
       setDecryptedResult('');
     }
+  };
+
+  const handleFullScreenEdit = (type: 'encrypt' | 'decrypt' | 'result') => {
+    let content = '';
+    if (type === 'encrypt') content = encryptText;
+    else if (type === 'decrypt') content = decryptText;
+    else if (type === 'result') content = encryptedResult || decryptedResult;
+    
+    setFullScreenType(type);
+    setFullScreenContent(content);
+    setFullScreenModalVisible(true);
+  };
+
+  const handleFullScreenSave = () => {
+    if (fullScreenType === 'encrypt') {
+      setEncryptText(fullScreenContent);
+    } else if (fullScreenType === 'decrypt') {
+      setDecryptText(fullScreenContent);
+    }
+    setFullScreenModalVisible(false);
+  };
+
+  const getCharacterCount = (text: string) => {
+    return `${text.length} 문자`;
   };
 
   return (
@@ -241,7 +276,20 @@ const MainPage: React.FC = () => {
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            <Text strong style={{ marginBottom: 8 }}>암호화할 텍스트</Text>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                              <Text strong>암호화할 텍스트</Text>
+                              <Space>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                  {getCharacterCount(encryptText)}
+                                </Text>
+                                <Button
+                                  size="small"
+                                  icon={<ExpandOutlined />}
+                                  onClick={() => handleFullScreenEdit('encrypt')}
+                                  title="전체 화면으로 편집"
+                                />
+                              </Space>
+                            </div>
                             <TextArea
                               value={encryptText}
                               onChange={(e) => setEncryptText(e.target.value)}
@@ -249,7 +297,8 @@ const MainPage: React.FC = () => {
                               style={{ 
                                 flex: 1,
                                 resize: 'none',
-                                minHeight: 'calc(100vh - 400px)'
+                                maxHeight: 'calc(100vh - 450px)',
+                                overflowY: 'auto'
                               }}
                             />
                           </div>
@@ -290,7 +339,30 @@ const MainPage: React.FC = () => {
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            <Text strong style={{ marginBottom: 8 }}>암호화된 텍스트</Text>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                              <Text strong>암호화된 텍스트</Text>
+                              <Space>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                  {getCharacterCount(encryptedResult)}
+                                </Text>
+                                {encryptedResult && (
+                                  <>
+                                    <Button
+                                      size="small"
+                                      icon={<ExpandOutlined />}
+                                      onClick={() => handleFullScreenEdit('result')}
+                                      title="전체 화면으로 보기"
+                                    />
+                                    <Button
+                                      size="small"
+                                      icon={<CopyOutlined />}
+                                      onClick={() => handleCopy(encryptedResult)}
+                                      title="클립보드에 복사"
+                                    />
+                                  </>
+                                )}
+                              </Space>
+                            </div>
                             <TextArea
                               value={encryptedResult}
                               readOnly
@@ -299,19 +371,10 @@ const MainPage: React.FC = () => {
                                 fontFamily: 'monospace',
                                 backgroundColor: '#f5f5f5',
                                 resize: 'none',
-                                minHeight: 'calc(100vh - 400px)'
+                                maxHeight: 'calc(100vh - 450px)',
+                                overflowY: 'auto'
                               }}
                             />
-                            {encryptedResult && (
-                              <Button 
-                                type="link" 
-                                icon={<CopyOutlined />}
-                                onClick={() => handleCopy(encryptedResult)}
-                                style={{ marginTop: 8, alignSelf: 'flex-start' }}
-                              >
-                                복사
-                              </Button>
-                            )}
                           </div>
                         </Card>
                       </Col>
@@ -346,7 +409,20 @@ const MainPage: React.FC = () => {
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            <Text strong style={{ marginBottom: 8 }}>복호화할 텍스트</Text>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                              <Text strong>복호화할 텍스트</Text>
+                              <Space>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                  {getCharacterCount(decryptText)}
+                                </Text>
+                                <Button
+                                  size="small"
+                                  icon={<ExpandOutlined />}
+                                  onClick={() => handleFullScreenEdit('decrypt')}
+                                  title="전체 화면으로 편집"
+                                />
+                              </Space>
+                            </div>
                             <TextArea
                               value={decryptText}
                               onChange={(e) => setDecryptText(e.target.value)}
@@ -355,7 +431,8 @@ const MainPage: React.FC = () => {
                                 flex: 1,
                                 fontFamily: 'monospace',
                                 resize: 'none',
-                                minHeight: 'calc(100vh - 400px)'
+                                maxHeight: 'calc(100vh - 450px)',
+                                overflowY: 'auto'
                               }}
                             />
                           </div>
@@ -396,7 +473,30 @@ const MainPage: React.FC = () => {
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            <Text strong style={{ marginBottom: 8 }}>복호화된 텍스트</Text>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                              <Text strong>복호화된 텍스트</Text>
+                              <Space>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                  {getCharacterCount(decryptedResult)}
+                                </Text>
+                                {decryptedResult && (
+                                  <>
+                                    <Button
+                                      size="small"
+                                      icon={<ExpandOutlined />}
+                                      onClick={() => handleFullScreenEdit('result')}
+                                      title="전체 화면으로 보기"
+                                    />
+                                    <Button
+                                      size="small"
+                                      icon={<CopyOutlined />}
+                                      onClick={() => handleCopy(decryptedResult)}
+                                      title="클립보드에 복사"
+                                    />
+                                  </>
+                                )}
+                              </Space>
+                            </div>
                             <TextArea
                               value={decryptedResult}
                               readOnly
@@ -404,19 +504,10 @@ const MainPage: React.FC = () => {
                                 flex: 1,
                                 backgroundColor: '#f5f5f5',
                                 resize: 'none',
-                                minHeight: 'calc(100vh - 400px)'
+                                maxHeight: 'calc(100vh - 450px)',
+                                overflowY: 'auto'
                               }}
                             />
-                            {decryptedResult && (
-                              <Button 
-                                type="link" 
-                                icon={<CopyOutlined />}
-                                onClick={() => handleCopy(decryptedResult)}
-                                style={{ marginTop: 8, alignSelf: 'flex-start' }}
-                              >
-                                복사
-                              </Button>
-                            )}
                           </div>
                         </Card>
                       </Col>
@@ -428,6 +519,65 @@ const MainPage: React.FC = () => {
           />
         </div>
       </div>
+      
+      {/* 전체 화면 편집 모달 */}
+      <Modal
+        title={
+          fullScreenType === 'encrypt' ? '암호화할 텍스트 편집' :
+          fullScreenType === 'decrypt' ? '복호화할 텍스트 편집' :
+          '결과 보기'
+        }
+        open={fullScreenModalVisible}
+        onCancel={() => setFullScreenModalVisible(false)}
+        width="90vw"
+        style={{ top: 20 }}
+        bodyStyle={{ 
+          height: 'calc(100vh - 200px)',
+          padding: '24px'
+        }}
+        footer={
+          fullScreenType !== 'result' ? [
+            <Button key="cancel" onClick={() => setFullScreenModalVisible(false)}>
+              취소
+            </Button>,
+            <Button key="save" type="primary" onClick={handleFullScreenSave}>
+              저장
+            </Button>
+          ] : [
+            <Button key="copy" icon={<CopyOutlined />} onClick={() => handleCopy(fullScreenContent)}>
+              복사
+            </Button>,
+            <Button key="close" onClick={() => setFullScreenModalVisible(false)}>
+              닫기
+            </Button>
+          ]
+        }
+      >
+        <TextArea
+          value={fullScreenContent}
+          onChange={(e) => setFullScreenContent(e.target.value)}
+          readOnly={fullScreenType === 'result'}
+          style={{
+            height: '100%',
+            resize: 'none',
+            fontFamily: fullScreenType === 'decrypt' || fullScreenType === 'result' ? 'monospace' : 'inherit',
+            fontSize: '14px'
+          }}
+          placeholder={
+            fullScreenType === 'encrypt' ? '암호화할 텍스트를 입력하세요...' :
+            fullScreenType === 'decrypt' ? '복호화할 암호화된 텍스트를 입력하세요...' :
+            ''
+          }
+        />
+        <div style={{ 
+          marginTop: '8px', 
+          textAlign: 'right',
+          fontSize: '12px',
+          color: '#666'
+        }}>
+          {getCharacterCount(fullScreenContent)}
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -4,6 +4,7 @@ export interface SavedKey {
   publicKey: string;
   privateKey: string;
   keySize: number;
+  preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1';
   created: Date;
 }
 
