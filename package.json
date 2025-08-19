@@ -153,13 +153,6 @@
       "installerHeaderIcon": "assets/icons/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "0-ROK",
-        "repo": "RiSA"
-      }
-    ]
+    }
   }
 }
