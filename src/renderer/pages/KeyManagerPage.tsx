@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Card, 
   Button, 
@@ -18,54 +18,52 @@ import {
   PlusOutlined, 
   CopyOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   EyeOutlined,
   EyeInvisibleOutlined
 } from '@ant-design/icons';
-import { useSettings } from '../store/SettingsContext';
-import { RSAKeyPair } from '../../shared/types';
+import { useKeys } from '../store/KeyContext';
+import { SavedKey } from '../../shared/types';
 import { RSA_KEY_SIZES } from '../../shared/constants';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 const KeyManagerPage: React.FC = () => {
-  const { settings } = useSettings();
-  const [keys, setKeys] = useState<RSAKeyPair[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { keys, loading, saveKey, deleteKey } = useKeys();
+  const [generateLoading, setGenerateLoading] = useState(false);
   const [generateModalVisible, setGenerateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
-  const [selectedKey, setSelectedKey] = useState<RSAKeyPair | null>(null);
+  const [selectedKey, setSelectedKey] = useState<SavedKey | null>(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [form] = Form.useForm();
 
-  useEffect(() => {
-    loadKeys();
-  }, []);
-
-  const loadKeys = async () => {
-    // In a real implementation, you'd fetch keys from the main process
-    // For now, we'll use a placeholder
-    setKeys([]);
-  };
-
-  const handleGenerateKey = async (values: { keySize: number }) => {
-    setLoading(true);
+  const handleGenerateKey = async (values: { name: string; keySize: number }) => {
+    setGenerateLoading(true);
     try {
       const keyPair = await window.electronAPI.generateRSAKeys(values.keySize);
-      setKeys(prev => [...prev, keyPair]);
+      
+      const savedKey: SavedKey = {
+        id: crypto.randomUUID(),
+        name: values.name,
+        publicKey: keyPair.publicKey,
+        privateKey: keyPair.privateKey,
+        keySize: values.keySize,
+        created: new Date(),
+      };
+
+      await saveKey(savedKey);
       setGenerateModalVisible(false);
       form.resetFields();
-      message.success(`${values.keySize}bit RSA 키가 생성되었습니다.`);
+      message.success(`"${values.name}" 키가 생성되었습니다.`);
     } catch (error) {
       message.error('키 생성 중 오류가 발생했습니다.');
       console.error(error);
     } finally {
-      setLoading(false);
+      setGenerateLoading(false);
     }
   };
 
-  const handleViewKey = (key: RSAKeyPair) => {
+  const handleViewKey = (key: SavedKey) => {
     setSelectedKey(key);
     setShowPrivateKey(false);
     setViewModalVisible(true);
@@ -80,25 +78,40 @@ const KeyManagerPage: React.FC = () => {
     }
   };
 
-  const handleDeleteKey = (key: RSAKeyPair) => {
-    setKeys(prev => prev.filter(k => k.created !== key.created));
-    message.success('키가 삭제되었습니다.');
+  const handleDeleteKey = async (key: SavedKey) => {
+    try {
+      await deleteKey(key.id);
+      message.success(`"${key.name}" 키가 삭제되었습니다.`);
+    } catch (error) {
+      message.error('키 삭제 중 오류가 발생했습니다.');
+    }
   };
 
   const columns = [
+    {
+      title: '이름',
+      dataIndex: 'name',
+      key: 'name',
+      width: 150,
+      render: (name: string) => (
+        <Text strong style={{ color: '#1890ff' }}>
+          {name}
+        </Text>
+      ),
+    },
     {
       title: '키 크기',
       dataIndex: 'keySize',
       key: 'keySize',
       render: (size: number) => `${size} bits`,
-      width: 120,
+      width: 100,
     },
     {
       title: '생성 일시',
       dataIndex: 'created',
       key: 'created',
       render: (date: Date) => new Date(date).toLocaleString('ko-KR'),
-      width: 180,
+      width: 160,
     },
     {
       title: '공개키 (미리보기)',
@@ -110,18 +123,18 @@ const KeyManagerPage: React.FC = () => {
           style={{ 
             fontFamily: 'monospace', 
             fontSize: '12px',
-            maxWidth: '300px'
+            maxWidth: '250px'
           }}
         >
-          {publicKey.substring(0, 50)}...
+          {publicKey.substring(0, 40)}...
         </Text>
       ),
     },
     {
       title: '작업',
       key: 'actions',
-      width: 200,
-      render: (_: any, record: RSAKeyPair) => (
+      width: 150,
+      render: (_: any, record: SavedKey) => (
         <Space size="small">
           <Tooltip title="키 보기">
             <Button 
@@ -141,7 +154,7 @@ const KeyManagerPage: React.FC = () => {
           
           <Tooltip title="키 삭제">
             <Popconfirm
-              title="이 키를 삭제하시겠습니까?"
+              title={`"${record.name}" 키를 삭제하시겠습니까?`}
               description="삭제된 키는 복구할 수 없습니다."
               onConfirm={() => handleDeleteKey(record)}
               okText="삭제"
@@ -187,7 +200,8 @@ const KeyManagerPage: React.FC = () => {
           <Table
             columns={columns}
             dataSource={keys}
-            rowKey={(record) => record.created.toString()}
+            rowKey={(record) => record.id}
+            loading={loading}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
@@ -214,8 +228,23 @@ const KeyManagerPage: React.FC = () => {
             form={form}
             layout="vertical"
             onFinish={handleGenerateKey}
-            initialValues={{ keySize: settings.rsaKeySize }}
+            initialValues={{ keySize: 2048 }}
           >
+            <Form.Item
+              label="키 이름"
+              name="name"
+              rules={[
+                { required: true, message: '키 이름을 입력해주세요.' },
+                { min: 1, max: 50, message: '키 이름은 1-50자 사이여야 합니다.' },
+              ]}
+              tooltip="키를 식별할 수 있는 이름을 입력하세요."
+            >
+              <Input 
+                placeholder="예: MyPersonalKey, WorkKey, TestKey..."
+                autoFocus
+              />
+            </Form.Item>
+
             <Form.Item
               label="키 크기"
               name="keySize"
@@ -238,7 +267,7 @@ const KeyManagerPage: React.FC = () => {
               <Button 
                 type="primary" 
                 htmlType="submit"
-                loading={loading}
+                loading={generateLoading}
               >
                 생성
               </Button>
@@ -248,7 +277,7 @@ const KeyManagerPage: React.FC = () => {
 
         {/* 키 보기 모달 */}
         <Modal
-          title={`RSA 키 정보 (${selectedKey?.keySize} bits)`}
+          title={`${selectedKey?.name} (${selectedKey?.keySize} bits)`}
           open={viewModalVisible}
           onCancel={() => {
             setViewModalVisible(false);
@@ -319,8 +348,9 @@ const KeyManagerPage: React.FC = () => {
 
               <div style={{ padding: '12px', backgroundColor: '#f0f2f5', borderRadius: '4px' }}>
                 <Space direction="vertical" size="small">
-                  <Text><strong>생성 일시:</strong> {new Date(selectedKey.created).toLocaleString('ko-KR')}</Text>
+                  <Text><strong>키 이름:</strong> {selectedKey.name}</Text>
                   <Text><strong>키 크기:</strong> {selectedKey.keySize} bits</Text>
+                  <Text><strong>생성 일시:</strong> {new Date(selectedKey.created).toLocaleString('ko-KR')}</Text>
                   <Text type="warning" style={{ fontSize: '12px' }}>
                     ⚠️ 개인키는 안전한 곳에 보관하고 타인과 공유하지 마세요.
                   </Text>

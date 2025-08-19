@@ -1,38 +1,37 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { AppSettings, RSAKeyPair, EncryptionResult } from '../shared/types';
+import { SavedKey, RSAKeyPair, EncryptionResult } from '../shared/types';
 import { IPC_CHANNELS } from '../shared/constants';
 
 const electronAPI = {
-  // Settings
-  getSettings: (): Promise<AppSettings> => 
-    ipcRenderer.invoke(IPC_CHANNELS.GET_SETTINGS),
+  // Key management
+  getSavedKeys: (): Promise<SavedKey[]> => 
+    ipcRenderer.invoke(IPC_CHANNELS.GET_SAVED_KEYS),
   
-  setSettings: (settings: AppSettings): Promise<void> => 
-    ipcRenderer.invoke(IPC_CHANNELS.SET_SETTINGS, settings),
+  saveKey: (key: SavedKey): Promise<void> => 
+    ipcRenderer.invoke(IPC_CHANNELS.SAVE_KEY, key),
 
-  // RSA Operations
+  deleteKey: (keyId: string): Promise<void> => 
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_KEY, keyId),
+
   generateRSAKeys: (keySize: number): Promise<RSAKeyPair> => 
     ipcRenderer.invoke(IPC_CHANNELS.GENERATE_RSA_KEYS, keySize),
 
-  encryptText: (text: string, publicKey: string): Promise<EncryptionResult> => 
-    ipcRenderer.invoke(IPC_CHANNELS.ENCRYPT_TEXT, text, publicKey),
+  // Encryption/Decryption
+  encryptText: (text: string, publicKey: string, algorithm?: string): Promise<EncryptionResult> => 
+    ipcRenderer.invoke(IPC_CHANNELS.ENCRYPT_TEXT, text, publicKey, algorithm),
 
-  decryptText: (encryptedText: string, privateKey: string): Promise<string> => 
-    ipcRenderer.invoke(IPC_CHANNELS.DECRYPT_TEXT, encryptedText, privateKey),
+  decryptText: (encryptedText: string, privateKey: string, algorithm?: string): Promise<string> => 
+    ipcRenderer.invoke(IPC_CHANNELS.DECRYPT_TEXT, encryptedText, privateKey, algorithm),
 
-  // File Operations
-  selectFolder: (): Promise<string | null> => 
-    ipcRenderer.invoke(IPC_CHANNELS.SELECT_FOLDER),
-
+  // File operations
   selectFile: (): Promise<string | null> => 
     ipcRenderer.invoke(IPC_CHANNELS.SELECT_FILE),
 
-  // Import/Export
-  exportSettings: (): Promise<boolean> => 
-    ipcRenderer.invoke(IPC_CHANNELS.EXPORT_SETTINGS),
+  exportKey: (key: SavedKey): Promise<boolean> => 
+    ipcRenderer.invoke(IPC_CHANNELS.EXPORT_KEY, key),
 
-  importSettings: (): Promise<boolean> => 
-    ipcRenderer.invoke(IPC_CHANNELS.IMPORT_SETTINGS),
+  importKey: (): Promise<SavedKey | null> => 
+    ipcRenderer.invoke(IPC_CHANNELS.IMPORT_KEY),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

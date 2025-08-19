@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import App from './App';
-import { SettingsProvider } from './store/SettingsContext';
+import { KeyProvider } from './store/KeyContext';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
@@ -11,7 +11,7 @@ const root = createRoot(container!);
 root.render(
   <React.StrictMode>
     <BrowserRouter>
-      <SettingsProvider>
+      <KeyProvider>
         <ConfigProvider
           theme={{
             algorithm: theme.defaultAlgorithm,
@@ -22,7 +22,7 @@ root.render(
         >
           <App />
         </ConfigProvider>
-      </SettingsProvider>
+      </KeyProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

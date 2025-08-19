@@ -2,7 +2,6 @@ import React from 'react';
 import { Layout, Menu, Typography } from 'antd';
 import { 
   LockOutlined, 
-  SettingOutlined, 
   KeyOutlined,
   HomeOutlined 
 } from '@ant-design/icons';
@@ -25,11 +24,6 @@ const Sidebar: React.FC = () => {
       key: '/keys',
       icon: <KeyOutlined />,
       label: '키 관리',
-    },
-    {
-      key: '/settings',
-      icon: <SettingOutlined />,
-      label: '설정',
     },
   ];
 
