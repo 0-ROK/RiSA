@@ -27,12 +27,21 @@ fi
 # 템플릿 복사 및 변수 치환
 cp templates/index.html _site/index.html
 
+# 운영체제별 sed 명령어 처리
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS
+  SED_INPLACE="sed -i ''"
+else
+  # Linux
+  SED_INPLACE="sed -i"
+fi
+
 # 버전 정보 치환
-sed -i '' "s/__VERSION__/$TAG_NAME/g" _site/index.html
+$SED_INPLACE "s|__VERSION__|$TAG_NAME|g" _site/index.html
 
 # Assets 정보 치환 (JSON 이스케이프 처리)
 ESCAPED_ASSETS=$(echo "$ASSETS" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr -d '\n')
-sed -i '' "s/__ASSETS__/$ESCAPED_ASSETS/g" _site/index.html
+$SED_INPLACE "s|__ASSETS__|$ESCAPED_ASSETS|g" _site/index.html
 
 echo "Generated _site/index.html successfully"
 echo "File size: $(wc -c < _site/index.html) bytes"
