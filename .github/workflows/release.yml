@@ -207,20 +207,16 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Get release info from job output
+      - name: Get release info using GitHub API
         id: get_release
         run: |
           echo "tag_name=${{ needs.release.outputs.tag_name }}" >> $GITHUB_OUTPUT
           echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag_name }}" >> $GITHUB_OUTPUT
           
-          # Convert release files to assets format with download URLs
+          # Get actual release assets from GitHub API
           echo 'assets<<EOF' >> $GITHUB_OUTPUT
-          echo '${{ needs.release.outputs.release_files }}' | jq -r '.[] | {
-            name: .name,
-            download_url: "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.tag_name }}/\(.name)",
-            size: .size,
-            download_count: 0
-          }' | jq -s . >> $GITHUB_OUTPUT
+          curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ needs.release.outputs.tag_name }}" | \
+            jq '.assets | map({name: .name, download_url: .browser_download_url, size: .size, download_count: .download_count})' >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Generate landing page
@@ -306,21 +302,6 @@ jobs:
                       font-weight: 500;
                   }
                   
-                  .screenshot {
-                      padding: 3rem 0;
-                      background: white;
-                  }
-                  .screenshot-container {
-                      text-align: center;
-                  }
-                  .app-screenshot {
-                      max-width: 100%;
-                      height: auto;
-                      border-radius: 12px;
-                      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-                      border: 1px solid #f0f0f0;
-                  }
-                  
                   .downloads {
                       background: white;
                       margin: 2rem 0;
@@ -330,13 +311,21 @@ jobs:
                   }
                   .downloads h2 {
                       text-align: center;
-                      margin-bottom: 2rem;
+                      margin-bottom: 1rem;
                       font-size: 2rem;
                       color: #333;
                   }
+                  .system-detect {
+                      text-align: center;
+                      margin-bottom: 2rem;
+                      padding: 1rem;
+                      background: #f0f9ff;
+                      border-radius: 8px;
+                      color: #0284c7;
+                  }
                   .download-grid {
                       display: grid;
-                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
                       gap: 2rem;
                       margin-top: 2rem;
                   }
@@ -344,37 +333,93 @@ jobs:
                       border: 2px solid #f0f0f0;
                       border-radius: 12px;
                       padding: 2rem;
-                      text-align: center;
                       transition: all 0.3s ease;
+                  }
+                  .download-card.recommended {
+                      border-color: #667eea;
+                      background: linear-gradient(to bottom, #f0f4ff, #ffffff);
                   }
                   .download-card:hover {
                       border-color: #667eea;
                       transform: translateY(-5px);
                       box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
                   }
+                  .platform-header {
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      margin-bottom: 1.5rem;
+                  }
                   .platform-icon {
-                      font-size: 3rem;
-                      margin-bottom: 1rem;
+                      font-size: 2.5rem;
+                      margin-right: 1rem;
+                  }
+                  .platform-name {
+                      font-size: 1.5rem;
+                      font-weight: 700;
+                      color: #333;
+                  }
+                  .recommended-badge {
+                      display: inline-block;
+                      background: #667eea;
+                      color: white;
+                      padding: 0.25rem 0.75rem;
+                      border-radius: 20px;
+                      font-size: 0.8rem;
+                      margin-left: 1rem;
+                  }
+                  .download-options {
+                      display: flex;
+                      flex-direction: column;
+                      gap: 1rem;
+                  }
+                  .download-option {
+                      border: 1px solid #e0e0e0;
+                      border-radius: 8px;
+                      padding: 1rem;
+                      background: #fafafa;
+                  }
+                  .download-option-header {
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 0.5rem;
+                  }
+                  .arch-label {
+                      font-weight: 600;
+                      color: #333;
+                  }
+                  .arch-desc {
+                      font-size: 0.85rem;
+                      color: #666;
                   }
                   .download-btn {
                       display: inline-block;
                       background: linear-gradient(45deg, #667eea, #764ba2);
                       color: white;
-                      padding: 1rem 2rem;
-                      border-radius: 8px;
+                      padding: 0.75rem 1.5rem;
+                      border-radius: 6px;
                       text-decoration: none;
                       font-weight: 600;
-                      margin: 0.5rem;
+                      font-size: 0.9rem;
+                      margin: 0.25rem;
                       transition: all 0.3s ease;
                   }
                   .download-btn:hover {
                       transform: translateY(-2px);
                       box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
                   }
+                  .download-btn.secondary {
+                      background: #f3f4f6;
+                      color: #333;
+                  }
+                  .download-btn.secondary:hover {
+                      background: #e5e7eb;
+                  }
                   .file-size {
-                      font-size: 0.9rem;
+                      font-size: 0.85rem;
                       color: #666;
-                      margin-top: 0.5rem;
+                      margin-left: 0.5rem;
                   }
                   
                   .features {
@@ -424,6 +469,7 @@ jobs:
                       .hero p { font-size: 1.1rem; }
                       .downloads { padding: 2rem 1rem; }
                       .nav-links { display: none; }
+                      .download-grid { grid-template-columns: 1fr; }
                   }
               </style>
           </head>
@@ -449,17 +495,12 @@ jobs:
                   </div>
               </section>
 
-              <section class="screenshot">
-                  <div class="container">
-                      <div class="screenshot-container">
-                          <img src="https://raw.githubusercontent.com/0-ROK/RiSA/main/assets/screenshot.png" alt="RiSA 앱 스크린샷" class="app-screenshot">
-                      </div>
-                  </div>
-              </section>
-
               <section class="downloads" id="download">
                   <div class="container">
                       <h2>📥 다운로드</h2>
+                      <div class="system-detect" id="system-detect">
+                          시스템 감지 중...
+                      </div>
                       <div class="download-grid" id="download-grid">
                           <!-- 다운로드 링크가 여기에 동적으로 생성됩니다 -->
                       </div>
@@ -501,75 +542,300 @@ jobs:
               </footer>
 
               <script>
-                  // 다운로드 링크 생성
+                  // 다운로드 링크 생성 및 시스템 감지
                   const assets = ${{ steps.get_release.outputs.assets }};
                   const tagName = '${{ steps.get_release.outputs.tag_name }}';
                   const downloadGrid = document.getElementById('download-grid');
+                  const systemDetect = document.getElementById('system-detect');
                   
-                  const platformData = {
-                      'win': { name: '🪟 Windows', icon: '🪟', fallbackUrl: `https://github.com/0-ROK/RiSA/releases/download/${tagName}/RiSA-1.0.0-win.exe` },
-                      'mac': { name: '🍎 macOS', icon: '🍎', fallbackUrl: `https://github.com/0-ROK/RiSA/releases/download/${tagName}/RiSA-1.0.0-mac-x64.dmg` },
-                      'linux': { name: '🐧 Linux', icon: '🐧', fallbackUrl: `https://github.com/0-ROK/RiSA/releases/download/${tagName}/RiSA-1.0.0-linux-x64.AppImage` }
-                  };
+                  // 시스템 감지
+                  function detectSystem() {
+                      const platform = navigator.platform.toLowerCase();
+                      const userAgent = navigator.userAgent.toLowerCase();
+                      
+                      if (platform.includes('win') || userAgent.includes('windows')) {
+                          const is64bit = navigator.userAgent.includes('WOW64') || navigator.userAgent.includes('Win64');
+                          return { os: 'windows', arch: is64bit ? 'x64' : 'ia32' };
+                      } else if (platform.includes('mac') || userAgent.includes('mac')) {
+                          // Check for Apple Silicon
+                          const isAppleSilicon = navigator.userAgent.includes('ARM') || 
+                                                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                          return { os: 'macos', arch: isAppleSilicon ? 'arm64' : 'x64' };
+                      } else if (platform.includes('linux') || userAgent.includes('linux')) {
+                          return { os: 'linux', arch: 'x64' };
+                      }
+                      return { os: 'unknown', arch: 'unknown' };
+                  }
                   
                   function formatFileSize(bytes) {
                       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
                       if (bytes === 0) return '0 Bytes';
                       const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-                      return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+                      return Math.round(bytes / Math.pow(1024, i) * 10) / 10 + ' ' + sizes[i];
                   }
                   
-                  // assets가 비어있거나 없는 경우 폴백 처리
-                  if (!assets || assets.length === 0) {
-                      Object.keys(platformData).forEach(platform => {
-                          const card = document.createElement('div');
-                          card.className = 'download-card';
+                  function categorizeAssets(assets) {
+                      const categorized = {
+                          windows: {
+                              x64: [],
+                              ia32: [],
+                              portable: [],
+                              other: []
+                          },
+                          macos: {
+                              arm64: { dmg: [], zip: [] },
+                              x64: { dmg: [], zip: [] }
+                          },
+                          linux: {
+                              appimage: [],
+                              deb: [],
+                              rpm: []
+                          }
+                      };
+                      
+                      assets.forEach(asset => {
+                          const name = asset.name.toLowerCase();
                           
-                          card.innerHTML = `
-                              <div class="platform-icon">${platformData[platform].icon}</div>
-                              <h3>${platformData[platform].name}</h3>
-                              <a href="https://github.com/0-ROK/RiSA/releases/latest" class="download-btn">
-                                  최신 릴리즈에서 다운로드
-                              </a>
-                          `;
-                          
-                          downloadGrid.appendChild(card);
+                          if (name.includes('win') || name.includes('windows') || name.endsWith('.exe')) {
+                              if (name.includes('x64')) {
+                                  categorized.windows.x64.push(asset);
+                              } else if (name.includes('ia32')) {
+                                  categorized.windows.ia32.push(asset);
+                              } else if (name.includes('portable')) {
+                                  categorized.windows.portable.push(asset);
+                              } else {
+                                  categorized.windows.other.push(asset);
+                              }
+                          } else if (name.includes('mac') || name.includes('darwin')) {
+                              if (name.includes('arm64')) {
+                                  if (name.endsWith('.dmg')) {
+                                      categorized.macos.arm64.dmg.push(asset);
+                                  } else if (name.endsWith('.zip')) {
+                                      categorized.macos.arm64.zip.push(asset);
+                                  }
+                              } else if (name.includes('x64')) {
+                                  if (name.endsWith('.dmg')) {
+                                      categorized.macos.x64.dmg.push(asset);
+                                  } else if (name.endsWith('.zip')) {
+                                      categorized.macos.x64.zip.push(asset);
+                                  }
+                              }
+                          } else if (name.includes('linux')) {
+                              if (name.endsWith('.appimage')) {
+                                  categorized.linux.appimage.push(asset);
+                              } else if (name.endsWith('.deb')) {
+                                  categorized.linux.deb.push(asset);
+                              } else if (name.endsWith('.rpm')) {
+                                  categorized.linux.rpm.push(asset);
+                              }
+                          }
                       });
-                  } else {
-                      Object.keys(platformData).forEach(platform => {
-                          const platformAssets = assets.filter(asset => 
-                              asset.name.toLowerCase().includes(platform)
-                          );
+                      
+                      return categorized;
+                  }
+                  
+                  function createDownloadCard(platform, platformAssets, recommended) {
+                      const card = document.createElement('div');
+                      card.className = 'download-card' + (recommended ? ' recommended' : '');
+                      
+                      let content = '';
+                      
+                      if (platform === 'windows') {
+                          content = `
+                              <div class="platform-header">
+                                  <span class="platform-icon">🪟</span>
+                                  <span class="platform-name">Windows</span>
+                                  ${recommended ? '<span class="recommended-badge">추천</span>' : ''}
+                              </div>
+                              <div class="download-options">`;
                           
-                          const card = document.createElement('div');
-                          card.className = 'download-card';
-                          
-                          let downloadButtons = '';
-                          if (platformAssets.length > 0) {
-                              platformAssets.forEach(asset => {
-                                  downloadButtons += `
-                                      <a href="${asset.download_url}" class="download-btn">
-                                          ${asset.name}
-                                          <div class="file-size">${formatFileSize(asset.size)}</div>
-                                      </a>
-                                  `;
+                          if (platformAssets.x64.length > 0) {
+                              content += `
+                                  <div class="download-option">
+                                      <div class="download-option-header">
+                                          <span class="arch-label">64비트 (x64)</span>
+                                          <span class="arch-desc">대부분의 최신 PC</span>
+                                      </div>`;
+                              platformAssets.x64.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn">
+                                      다운로드<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
                               });
-                          } else {
-                              downloadButtons = `
-                                  <a href="https://github.com/0-ROK/RiSA/releases/latest" class="download-btn">
-                                      최신 릴리즈에서 다운로드
-                                  </a>
-                              `;
+                              content += `</div>`;
                           }
                           
-                          card.innerHTML = `
-                              <div class="platform-icon">${platformData[platform].icon}</div>
-                              <h3>${platformData[platform].name}</h3>
-                              ${downloadButtons}
-                          `;
+                          if (platformAssets.ia32.length > 0) {
+                              content += `
+                                  <div class="download-option">
+                                      <div class="download-option-header">
+                                          <span class="arch-label">32비트 (ia32)</span>
+                                          <span class="arch-desc">구형 PC용</span>
+                                      </div>`;
+                              platformAssets.ia32.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn secondary">
+                                      다운로드<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              content += `</div>`;
+                          }
                           
-                          downloadGrid.appendChild(card);
-                      });
+                          if (platformAssets.other.length > 0) {
+                              platformAssets.other.forEach(asset => {
+                                  if (!asset.name.toLowerCase().includes('blockmap')) {
+                                      content += `<a href="${asset.download_url}" class="download-btn">
+                                          ${asset.name}<span class="file-size">${formatFileSize(asset.size)}</span>
+                                      </a>`;
+                                  }
+                              });
+                          }
+                          
+                          content += `</div>`;
+                          
+                      } else if (platform === 'macos') {
+                          content = `
+                              <div class="platform-header">
+                                  <span class="platform-icon">🍎</span>
+                                  <span class="platform-name">macOS</span>
+                                  ${recommended ? '<span class="recommended-badge">추천</span>' : ''}
+                              </div>
+                              <div class="download-options">`;
+                          
+                          if (platformAssets.arm64.dmg.length > 0 || platformAssets.arm64.zip.length > 0) {
+                              content += `
+                                  <div class="download-option">
+                                      <div class="download-option-header">
+                                          <span class="arch-label">Apple Silicon</span>
+                                          <span class="arch-desc">M1/M2/M3 Mac</span>
+                                      </div>`;
+                              platformAssets.arm64.dmg.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn">
+                                      DMG<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              platformAssets.arm64.zip.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn secondary">
+                                      ZIP<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              content += `</div>`;
+                          }
+                          
+                          if (platformAssets.x64.dmg.length > 0 || platformAssets.x64.zip.length > 0) {
+                              content += `
+                                  <div class="download-option">
+                                      <div class="download-option-header">
+                                          <span class="arch-label">Intel Mac</span>
+                                          <span class="arch-desc">Intel 프로세서 Mac</span>
+                                      </div>`;
+                              platformAssets.x64.dmg.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn">
+                                      DMG<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              platformAssets.x64.zip.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn secondary">
+                                      ZIP<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              content += `</div>`;
+                          }
+                          
+                          content += `</div>`;
+                          
+                      } else if (platform === 'linux') {
+                          content = `
+                              <div class="platform-header">
+                                  <span class="platform-icon">🐧</span>
+                                  <span class="platform-name">Linux</span>
+                                  ${recommended ? '<span class="recommended-badge">추천</span>' : ''}
+                              </div>
+                              <div class="download-options">`;
+                          
+                          if (platformAssets.appimage.length > 0) {
+                              content += `
+                                  <div class="download-option">
+                                      <div class="download-option-header">
+                                          <span class="arch-label">AppImage</span>
+                                          <span class="arch-desc">모든 배포판용</span>
+                                      </div>`;
+                              platformAssets.appimage.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn">
+                                      다운로드<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              content += `</div>`;
+                          }
+                          
+                          if (platformAssets.deb.length > 0) {
+                              content += `
+                                  <div class="download-option">
+                                      <div class="download-option-header">
+                                          <span class="arch-label">DEB</span>
+                                          <span class="arch-desc">Ubuntu/Debian</span>
+                                      </div>`;
+                              platformAssets.deb.forEach(asset => {
+                                  content += `<a href="${asset.download_url}" class="download-btn secondary">
+                                      다운로드<span class="file-size">${formatFileSize(asset.size)}</span>
+                                  </a>`;
+                              });
+                              content += `</div>`;
+                          }
+                          
+                          content += `</div>`;
+                      }
+                      
+                      card.innerHTML = content;
+                      return card;
+                  }
+                  
+                  // 메인 실행
+                  const system = detectSystem();
+                  
+                  // 시스템 감지 메시지 업데이트
+                  if (system.os !== 'unknown') {
+                      const osNames = {
+                          'windows': 'Windows',
+                          'macos': 'macOS',
+                          'linux': 'Linux'
+                      };
+                      systemDetect.innerHTML = `✅ ${osNames[system.os]} 시스템이 감지되었습니다. 아래에서 적합한 버전을 선택하세요.`;
+                  } else {
+                      systemDetect.innerHTML = '⚠️ 시스템을 자동으로 감지할 수 없습니다. 아래에서 수동으로 선택해주세요.';
+                  }
+                  
+                  // assets가 있는 경우
+                  if (assets && assets.length > 0) {
+                      const categorized = categorizeAssets(assets);
+                      
+                      // Windows 카드
+                      if (categorized.windows.x64.length > 0 || categorized.windows.ia32.length > 0 || categorized.windows.other.length > 0) {
+                          const windowsCard = createDownloadCard('windows', categorized.windows, system.os === 'windows');
+                          downloadGrid.appendChild(windowsCard);
+                      }
+                      
+                      // macOS 카드
+                      if (categorized.macos.arm64.dmg.length > 0 || categorized.macos.arm64.zip.length > 0 ||
+                          categorized.macos.x64.dmg.length > 0 || categorized.macos.x64.zip.length > 0) {
+                          const macCard = createDownloadCard('macos', categorized.macos, system.os === 'macos');
+                          downloadGrid.appendChild(macCard);
+                      }
+                      
+                      // Linux 카드
+                      if (categorized.linux.appimage.length > 0 || categorized.linux.deb.length > 0) {
+                          const linuxCard = createDownloadCard('linux', categorized.linux, system.os === 'linux');
+                          downloadGrid.appendChild(linuxCard);
+                      }
+                      
+                  } else {
+                      // 폴백: GitHub 릴리즈 페이지로 연결
+                      downloadGrid.innerHTML = `
+                          <div style="text-align: center; grid-column: 1 / -1;">
+                              <p style="margin-bottom: 1rem;">릴리즈를 불러올 수 없습니다.</p>
+                              <a href="https://github.com/0-ROK/RiSA/releases/latest" class="download-btn">
+                                  GitHub에서 최신 릴리즈 보기
+                              </a>
+                          </div>
+                      `;
                   }
               </script>
           </body>
