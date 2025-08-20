@@ -185,13 +185,13 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            **/*.exe
-            **/*.msi
-            **/*.dmg
-            **/*.zip
-            **/*.AppImage
-            **/*.deb
-            **/*.rpm
+            release/*.exe
+            release/*.msi
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
