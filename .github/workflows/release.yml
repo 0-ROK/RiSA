@@ -108,6 +108,8 @@ jobs:
           if [ -f "certificate.p12" ]; then
             export CSC_LINK=certificate.p12
             export CSC_KEY_PASSWORD="${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+          else
+            echo "No certificate found, building without code signing"
           fi
           pnpm run package:mac
 
@@ -188,6 +190,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-pages:
+    if: always()
     needs: release
     runs-on: ubuntu-latest
     
@@ -210,13 +213,20 @@ jobs:
       - name: Get release info using GitHub API
         id: get_release
         run: |
-          echo "tag_name=${{ needs.release.outputs.tag_name }}" >> $GITHUB_OUTPUT
-          echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag_name }}" >> $GITHUB_OUTPUT
+          # Use tag from GitHub ref if release job outputs are not available
+          if [ -n "${{ needs.release.outputs.tag_name }}" ]; then
+            TAG_NAME="${{ needs.release.outputs.tag_name }}"
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
           
-          # Get actual release assets from GitHub API
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${TAG_NAME}" >> $GITHUB_OUTPUT
+          
+          # Try to get release assets from GitHub API
           echo 'assets<<EOF' >> $GITHUB_OUTPUT
-          curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ needs.release.outputs.tag_name }}" | \
-            jq '.assets | map({name: .name, download_url: .browser_download_url, size: .size, download_count: .download_count})' >> $GITHUB_OUTPUT
+          curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG_NAME}" | \
+            jq '.assets | map({name: .name, download_url: .browser_download_url, size: .size, download_count: .download_count}) // []' >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Generate landing page
