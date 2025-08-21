@@ -103,7 +103,12 @@
 1. **"확인되지 않은 개발자"** 경고 시:
    - 앱 파일을 **우클릭** → "**열기**" 선택
    - 다시 "**열기**" 확인 클릭
-2. **대안 방법**:
+2. **"앱이 손상되었습니다"** 경고 시:
+   ```bash
+   # 터미널에서 다음 명령어 실행
+   xattr -cr /Applications/RiSA.app
+   ```
+3. **대안 방법**:
    - 시스템 환경설정 → 보안 및 개인 정보 보호
    - "**확인 없이 열기**" 버튼 클릭
 
@@ -111,7 +116,7 @@
 - 대부분의 배포판에서 별도 설정 없이 실행 가능
 - 실행 권한이 필요한 경우: `chmod +x RiSA-*.AppImage`
 
-> **참고**: 이러한 경고는 코드 사이닝 인증서가 없기 때문입니다. 향후 사용자가 증가하면 인증서를 추가할 예정입니다.
+> **참고**: 현재 코드 사이닝 인증서 적용을 진행 중입니다. Apple Developer Program 연동 후에는 macOS에서 경고 없이 실행 가능합니다.
 
 ---
 
@@ -121,6 +126,41 @@ RiSA는 자동 업데이트를 지원합니다:
 - 새 버전 출시 시 앱 내 알림
 - 백그라운드 다운로드
 - 원클릭 설치 및 재시작
+
+---
+
+## 🔨 소스코드에서 빌드하기
+
+개발자나 고급 사용자를 위한 소스코드 빌드 방법:
+
+### 사전 요구사항
+- Node.js 18 이상
+- pnpm (권장) 또는 npm
+- Git
+
+### 빌드 과정
+```bash
+# 저장소 클론
+git clone https://github.com/0-ROK/RiSA.git
+cd RiSA
+
+# 의존성 설치
+pnpm install
+
+# 개발 모드 실행
+pnpm run dev
+
+# 프로덕션 빌드
+pnpm run build
+
+# 플랫폼별 패키징
+pnpm run package:win   # Windows
+pnpm run package:mac   # macOS
+pnpm run package:linux # Linux
+```
+
+### Apple Developer 통합 (macOS 개발자용)
+macOS 앱 서명 및 공증을 위한 설정은 [APPLE_DEVELOPER_SETUP.md](APPLE_DEVELOPER_SETUP.md)를 참조하세요.
 
 ---
 

@@ -106,18 +106,36 @@ jobs:
       - name: Package application (macOS)
         if: matrix.os == 'macos-latest'
         env:
+          CI: true
           CSC_IDENTITY_AUTO_DISCOVERY: false
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -f "certificate.p12" ]; then
+            echo "Certificate found, building with code signing and notarization"
             export CSC_LINK=certificate.p12
             export CSC_KEY_PASSWORD="${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+            
+            # Set notarization environment variables
+            export APPLE_APP_SPECIFIC_PASSWORD="${{ secrets.APPLE_ID_PASSWORD }}"
+            
+            # Build and sign
+            pnpm run package:mac
+            
+            # Verify signing
+            echo "Verifying code signature..."
+            for app in release/**/*.app; do
+              if [ -e "$app" ]; then
+                echo "Checking: $app"
+                codesign --verify --deep --strict --verbose=2 "$app" || true
+                spctl -a -t exec -vvv "$app" || true
+              fi
+            done
           else
             echo "No certificate found, building without code signing"
+            pnpm run package:mac
           fi
-          pnpm run package:mac
 
       - name: List built files (macOS)
         if: matrix.os == 'macos-latest'
