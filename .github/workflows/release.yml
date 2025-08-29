@@ -67,15 +67,39 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
         run: |
           if [ -n "$APPLE_CERTIFICATE" ]; then
+            echo "Setting up Apple certificate..."
+            
+            # Create variables for keychain
+            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+            KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+            
+            # Decode certificate from base64
             echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
-            security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" build.keychain
-            security default-keychain -s build.keychain
-            security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" build.keychain
-            security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$APPLE_KEYCHAIN_PASSWORD" build.keychain
+            
+            # Create temporary keychain
+            security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            
+            # Import certificate
+            security import certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+            security list-keychain -d user -s $KEYCHAIN_PATH login.keychain-db
+            security default-keychain -s $KEYCHAIN_PATH
+            
+            # Allow codesign to access the certificate without password prompt
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            
+            echo "Certificate imported successfully"
+            
+            # Verify certificate and set environment variables
+            security find-identity -v -p codesigning $KEYCHAIN_PATH
+            
+            # Clean up certificate file
+            rm -f certificate.p12
+          else
+            echo "No Apple certificate found in secrets"
           fi
 
       - name: Package application (Linux)
@@ -107,15 +131,14 @@ jobs:
         if: matrix.os == 'macos-latest'
         env:
           CI: true
-          CSC_IDENTITY_AUTO_DISCOVERY: false
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: true
         run: |
-          if [ -f "certificate.p12" ]; then
+          # Check if certificate was imported
+          if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
             echo "Certificate found, building with code signing and notarization"
-            export CSC_LINK=certificate.p12
-            export CSC_KEY_PASSWORD="${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
             
             # Set notarization environment variables
             export APPLE_APP_SPECIFIC_PASSWORD="${{ secrets.APPLE_ID_PASSWORD }}"
@@ -129,11 +152,12 @@ jobs:
               if [ -e "$app" ]; then
                 echo "Checking: $app"
                 codesign --verify --deep --strict --verbose=2 "$app" || true
-                spctl -a -t exec -vvv "$app" || true
+                spctl -a -t exec -vvv "$app" 2>&1 || true
               fi
             done
           else
             echo "No certificate found, building without code signing"
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
             pnpm run package:mac
           fi
 
