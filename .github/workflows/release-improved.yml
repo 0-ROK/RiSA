@@ -1,0 +1,47 @@
+name: Release and Deploy (Improved)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Get tag name
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        shell: bash
+      
+      # 🔥 핵심: 태그 버전을 package.json에 자동 적용
+      - name: Update package.json version
+        run: |
+          # 태그에서 v 제거 (v0.1.7 → 0.1.7)
+          VERSION=${TAG_NAME#v}
+          
+          # package.json 버전 업데이트
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+          else
+            # Linux/Windows Git Bash
+            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+          fi
+          
+          echo "Updated package.json to version $VERSION"
+          cat package.json | grep version
+        shell: bash
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      # 이후 빌드 진행...
