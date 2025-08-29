@@ -35,12 +35,47 @@
 open "/Applications/Utilities/Keychain Access.app"
 ```
 
+#### 방법 1: 키체인 접근 앱 사용 (권장)
+
 1. **키체인 접근** → `로그인` 키체인 선택
 2. `Developer ID Application: [Your Name]` 인증서 찾기
-3. 인증서와 개인 키를 모두 선택 (▶ 화살표 클릭하여 개인 키 표시)
-4. 우클릭 → `2개 항목 내보내기...`
-5. 파일 형식: `개인 정보 교환(.p12)` 선택
-6. **강력한 비밀번호 설정** (GitHub Secrets에서 사용)
+3. **중요**: 인증서 옆의 ▶ 화살표를 클릭하여 개인 키 표시
+4. **인증서와 개인 키를 함께 선택** (Cmd 키를 누르고 클릭)
+5. 우클릭 → `2개 항목 내보내기...`
+6. 파일 형식: `개인 정보 교환(.p12)` 선택
+7. **강력한 비밀번호 설정** (GitHub Secrets에서 사용)
+
+#### 방법 2: 개인 키만 따로 내보내기 (문제 발생 시)
+
+개인 키가 보이지 않거나 선택되지 않는 경우:
+
+1. **개인 키만 선택** → 우클릭 → `"개인 키" 내보내기...`
+2. 파일 형식: `개인 정보 교환(.p12)` 선택
+3. 비밀번호 설정 후 저장
+
+#### 방법 3: 터미널 명령어 사용
+
+```bash
+# 인증서 찾기
+security find-identity -v -p codesigning | grep "Developer ID Application"
+
+# 인증서 내보내기 (CERT_NAME을 실제 인증서 이름으로 변경)
+security export -k login.keychain -t identities -f pkcs12 -o certificate.p12 -P "your-password" "Developer ID Application: Your Name"
+```
+
+#### 문제 해결
+
+**"개인 키가 보이지 않음"**
+- Xcode → Preferences → Accounts → Download Manual Profiles
+- 또는 developer.apple.com에서 인증서를 다시 다운로드
+
+**"내보내기가 비활성화됨"**
+- 인증서와 개인 키가 같은 키체인에 있는지 확인
+- 키체인이 잠겨있지 않은지 확인
+
+**"비밀번호 오류"**
+- 키체인 비밀번호와 p12 내보내기 비밀번호는 다름
+- p12 비밀번호는 새로 설정하는 것
 
 ⚠️ **보안 주의**: .p12 파일은 절대 Git에 커밋하지 마세요!
 
