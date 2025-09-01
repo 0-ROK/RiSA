@@ -31,8 +31,8 @@ exports.default = async function notarizing(context) {
 
   console.log(`Notarizing ${appName}...`);
   console.log(`App path: ${appPath}`);
-  console.log(`Apple ID: ${process.env.APPLE_ID}`);
-  console.log(`Team ID: ${process.env.APPLE_TEAM_ID}`);
+  console.log(`Apple ID: ***`);
+  console.log(`Team ID: ***`);
 
   try {
     await notarize({

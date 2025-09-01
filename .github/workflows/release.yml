@@ -3,13 +3,29 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for release (e.g., v0.1.1)'
+        description: "Tag name for release (e.g., v0.1.1)"
         required: true
-        default: 'v0.1.1'
+        default: "v0.1.1"
+
+env:
+  # Mask sensitive values in logs
+  APPLE_ID: ${{ secrets.APPLE_ID }}
+  APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+  WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+  WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+  # CI and build configuration
+  CI: true
+
+  # Code signing configuration
+  CSC_IDENTITY_AUTO_DISCOVERY: true
 
 permissions:
   contents: write
@@ -29,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -64,9 +80,6 @@ jobs:
 
       - name: Import Apple certificate (macOS only)
         if: matrix.os == 'macos-latest'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
           if [ -n "$APPLE_CERTIFICATE" ]; then
             echo "Setting up Apple certificate..."
@@ -89,18 +102,28 @@ jobs:
             security default-keychain -s $KEYCHAIN_PATH
             
             # Allow codesign to access the certificate without password prompt
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-            
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH >/dev/null 2>&1
+
             echo "Certificate imported successfully"
-            
-            # Verify certificate and set environment variables
-            security find-identity -v -p codesigning $KEYCHAIN_PATH
-            
+
+            # Verify certificate (minimal output)
+            if security find-identity -p codesigning $KEYCHAIN_PATH >/dev/null 2>&1; then
+              echo "Certificate verification successful"
+            else
+              echo "Certificate verification failed"
+              exit 1
+            fi
+
             # Clean up certificate file
             rm -f certificate.p12
           else
             echo "No Apple certificate found in secrets"
           fi
+
+      - name: Validate secrets (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "Linux 빌드에서는 별도의 secret 검증이 필요하지 않습니다."
 
       - name: Package application (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -112,12 +135,28 @@ jobs:
           echo "=== Built files for Linux ==="
           find . -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec ls -la {} \;
 
+      - name: Validate secrets (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          if [ -z "$WIN_CSC_LINK" ]; then
+            echo "❌ ERROR: WIN_CSC_LINK secret이 설정되지 않았습니다."
+            echo "Windows 코드 사이닝을 위해 WIN_CSC_LINK secret을 설정해주세요."
+            exit 1
+          fi
+
+          if [ -z "$WIN_CSC_KEY_PASSWORD" ]; then
+            echo "❌ ERROR: WIN_CSC_KEY_PASSWORD secret이 설정되지 않았습니다."
+            echo "Windows 코드 사이닝을 위해 WIN_CSC_KEY_PASSWORD secret을 설정해주세요."
+            exit 1
+          fi
+
+          echo "✅ Windows 코드 사이닝 secrets가 모두 설정되었습니다."
+        shell: bash
+
       - name: Package application (Windows)
         if: matrix.os == 'windows-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: pnpm run package:win
 
       - name: List built files (Windows)
@@ -127,38 +166,69 @@ jobs:
           Get-ChildItem -Recurse -Include "*.exe","*.msi" | ForEach-Object { Write-Host $_.FullName "; Size:" $_.Length }
         shell: powershell
 
+      - name: Validate secrets (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Apple 인증서 관련 secrets 검증
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "❌ ERROR: APPLE_CERTIFICATE secret이 설정되지 않았습니다."
+            echo "macOS 코드 사이닝을 위해 APPLE_CERTIFICATE secret을 설정해주세요."
+            exit 1
+          fi
+
+          if [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            echo "❌ ERROR: APPLE_CERTIFICATE_PASSWORD secret이 설정되지 않았습니다."
+            echo "macOS 코드 사이닝을 위해 APPLE_CERTIFICATE_PASSWORD secret을 설정해주세요."
+            exit 1
+          fi
+
+          # Apple ID 관련 secrets 검증
+          if [ -z "$APPLE_ID" ]; then
+            echo "❌ ERROR: APPLE_ID secret이 설정되지 않았습니다."
+            echo "macOS 노타리제이션을 위해 APPLE_ID secret을 설정해주세요."
+            exit 1
+          fi
+
+          if [ -z "$APPLE_ID_PASSWORD" ]; then
+            echo "❌ ERROR: APPLE_ID_PASSWORD secret이 설정되지 않았습니다."
+            echo "macOS 노타리제이션을 위해 APPLE_ID_PASSWORD secret을 설정해주세요."
+            exit 1
+          fi
+
+          if [ -z "$APPLE_TEAM_ID" ]; then
+            echo "❌ ERROR: APPLE_TEAM_ID secret이 설정되지 않았습니다."
+            echo "macOS 노타리제이션을 위해 APPLE_TEAM_ID secret을 설정해주세요."
+            exit 1
+          fi
+
+          echo "✅ macOS 코드 사이닝 및 노타리제이션 secrets가 모두 설정되었습니다."
+        shell: bash
+
       - name: Package application (macOS)
         if: matrix.os == 'macos-latest'
-        env:
-          CI: true
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_IDENTITY_AUTO_DISCOVERY: true
         run: |
-          # Check if certificate was imported
-          if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
+          # Check if certificate was imported (suppress sensitive output)
+          if security find-identity -p codesigning | grep -q "Developer ID Application" 2>/dev/null; then
             echo "Certificate found, building with code signing and notarization"
-            
-            # Set notarization environment variables
-            export APPLE_APP_SPECIFIC_PASSWORD="${{ secrets.APPLE_ID_PASSWORD }}"
-            
+
             # Build and sign
             pnpm run package:mac
-            
-            # Verify signing
+
+            # Verify signing (minimal output to avoid exposing sensitive info)
             echo "Verifying code signature..."
             for app in release/**/*.app; do
               if [ -e "$app" ]; then
-                echo "Checking: $app"
-                codesign --verify --deep --strict --verbose=2 "$app" || true
-                spctl -a -t exec -vvv "$app" 2>&1 || true
+                echo "Checking: $(basename "$app")"
+                if codesign --verify --deep --strict "$app" >/dev/null 2>&1; then
+                  echo "✓ Code signature valid for $(basename "$app")"
+                else
+                  echo "⚠ Code signature verification failed for $(basename "$app")"
+                fi
               fi
             done
           else
-            echo "No certificate found, building without code signing"
-            export CSC_IDENTITY_AUTO_DISCOVERY=false
-            pnpm run package:mac
+            echo "Unexpected: Certificate not found after validation"
+            exit 1
           fi
 
       - name: List built files (macOS)
@@ -187,7 +257,7 @@ jobs:
     outputs:
       release_files: ${{ steps.get_files.outputs.files }}
       tag_name: ${{ steps.get_tag.outputs.tag_name }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -241,7 +311,7 @@ jobs:
     if: always()
     needs: release
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
       pages: write
@@ -266,14 +336,14 @@ jobs:
           else
             TAG_NAME="${GITHUB_REF#refs/tags/}"
           fi
-          
+
           # Run the page generation script
           ./scripts/generate-page.sh "$TAG_NAME" "${{ github.repository }}"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '_site'
+          path: "_site"
 
       - name: Deploy to GitHub Pages
         id: deployment
