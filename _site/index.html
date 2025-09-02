@@ -183,15 +183,14 @@
             const platform = navigator.platform.toLowerCase();
             const userAgent = navigator.userAgent.toLowerCase();
             
-            if (platform.includes('win') || userAgent.includes('windows')) {
-                const is64bit = navigator.userAgent.includes('WOW64') || navigator.userAgent.includes('Win64');
-                return { os: 'windows', arch: is64bit ? 'x64' : 'ia32' };
-            } else if (platform.includes('mac') || userAgent.includes('mac')) {
+            if (platform.includes('mac') || userAgent.includes('mac')) {
                 const isAppleSilicon = navigator.userAgent.includes('ARM') || 
                                        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
                 return { os: 'macos', arch: isAppleSilicon ? 'arm64' : 'x64' };
+            } else if (platform.includes('win') || userAgent.includes('windows')) {
+                return { os: 'windows', arch: 'unknown' };
             } else if (platform.includes('linux') || userAgent.includes('linux')) {
-                return { os: 'linux', arch: 'x64' };
+                return { os: 'linux', arch: 'unknown' };
             }
             return { os: 'unknown', arch: 'unknown' };
         }
@@ -379,31 +378,40 @@
         // 메인 실행
         const system = detectSystem();
         
-        if (system.os !== 'unknown') {
-            const osNames = { 'windows': 'Windows', 'macos': 'macOS', 'linux': 'Linux' };
-            systemDetect.innerHTML = `✅ ${osNames[system.os]} 시스템이 감지되었습니다. 아래에서 적합한 버전을 선택하세요.`;
+        if (system.os === 'macos') {
+            systemDetect.innerHTML = '✅ macOS 시스템이 감지되었습니다. 아래에서 적합한 버전을 선택하세요.';
+        } else if (system.os === 'windows') {
+            systemDetect.innerHTML = '⚠️ Windows 지원은 추후 업데이트에서 제공될 예정입니다.';
+        } else if (system.os === 'linux') {
+            systemDetect.innerHTML = '⚠️ Linux 지원은 추후 업데이트에서 제공될 예정입니다.';
         } else {
-            systemDetect.innerHTML = '⚠️ 시스템을 자동으로 감지할 수 없습니다. 아래에서 수동으로 선택해주세요.';
+            systemDetect.innerHTML = '⚠️ 현재 macOS만 지원됩니다. Windows/Linux 지원은 추후 업데이트에서 제공될 예정입니다.';
         }
         
         if (assets && assets.length > 0) {
             const categorized = categorizeAssets(assets);
             
-            if (categorized.windows.x64.length > 0 || categorized.windows.ia32.length > 0 || categorized.windows.other.length > 0) {
-                const windowsCard = createDownloadCard('windows', categorized.windows, system.os === 'windows');
-                downloadGrid.appendChild(windowsCard);
-            }
-            
+            // macOS만 표시
             if (categorized.macos.arm64.dmg.length > 0 || categorized.macos.arm64.zip.length > 0 ||
                 categorized.macos.x64.dmg.length > 0 || categorized.macos.x64.zip.length > 0) {
                 const macCard = createDownloadCard('macos', categorized.macos, system.os === 'macos');
                 downloadGrid.appendChild(macCard);
             }
             
-            if (categorized.linux.appimage.length > 0 || categorized.linux.deb.length > 0) {
-                const linuxCard = createDownloadCard('linux', categorized.linux, system.os === 'linux');
-                downloadGrid.appendChild(linuxCard);
-            }
+            // Windows/Linux 추후 지원 메시지
+            const comingSoonCard = document.createElement('div');
+            comingSoonCard.className = 'download-card';
+            comingSoonCard.innerHTML = `
+                <div class="platform-header">
+                    <span class="platform-icon">🚀</span>
+                    <span class="platform-name">Windows & Linux</span>
+                </div>
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="margin-bottom: 1rem; color: #666;">Windows와 Linux 지원은 추후 업데이트에서 제공될 예정입니다.</p>
+                    <p style="color: #888; font-size: 0.9rem;">현재는 macOS만 지원됩니다.</p>
+                </div>
+            `;
+            downloadGrid.appendChild(comingSoonCard);
         } else {
             downloadGrid.innerHTML = `
                 <div style="text-align: center; grid-column: 1 / -1;">
