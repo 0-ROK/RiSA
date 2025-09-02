@@ -13,9 +13,17 @@ exports.default = async function notarizing(context) {
 
   // Check if running in CI and has required environment variables
   const isCI = process.env.CI === 'true';
+  
+  // Debug: Check which environment variables are available (masked for security)
+  console.log('Environment check:');
+  console.log(`  CI: ${isCI}`);
+  console.log(`  APPLE_ID: ${process.env.APPLE_ID ? '***SET***' : 'NOT_SET'}`);
+  console.log(`  APPLE_APP_SPECIFIC_PASSWORD: ${process.env.APPLE_APP_SPECIFIC_PASSWORD ? '***SET***' : 'NOT_SET'}`);
+  console.log(`  APPLE_TEAM_ID: ${process.env.APPLE_TEAM_ID ? '***SET***' : 'NOT_SET'}`);
+  
   const hasAppleCredentials = 
     process.env.APPLE_ID && 
-    process.env.APPLE_ID_PASSWORD && 
+    process.env.APPLE_APP_SPECIFIC_PASSWORD && 
     process.env.APPLE_TEAM_ID;
 
   if (!hasAppleCredentials) {
@@ -39,7 +47,7 @@ exports.default = async function notarizing(context) {
       appBundleId: 'com.risateam.risa',
       appPath: appPath,
       appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_ID_PASSWORD,
+      appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID,
     });
     

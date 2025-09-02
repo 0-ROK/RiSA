@@ -137,7 +137,7 @@ base64 -i /path/to/certificate.p12 | pbcopy
 
 - Apple Developer 계정 이메일 주소
 
-#### `APPLE_ID_PASSWORD`
+#### `APPLE_APP_SPECIFIC_PASSWORD`
 
 - 3단계에서 생성한 앱 전용 비밀번호
 
@@ -165,7 +165,7 @@ security find-identity -v -p codesigning | grep "Developer ID Application"
 ```bash
 # 환경변수 설정 (임시)
 export APPLE_ID="your-email@example.com"
-export APPLE_ID_PASSWORD="your-app-specific-password"
+export APPLE_APP_SPECIFIC_PASSWORD="your-app-specific-password"
 export APPLE_TEAM_ID="YOUR_TEAM_ID"
 
 # 빌드 테스트
@@ -211,13 +211,13 @@ git push origin v0.1.6
 # 공증 히스토리 확인
 xcrun notarytool history \
   --apple-id "$APPLE_ID" \
-  --password "$APPLE_ID_PASSWORD" \
+  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
   --team-id "$APPLE_TEAM_ID"
 
 # 특정 제출 상태 확인
 xcrun notarytool info <submission-id> \
   --apple-id "$APPLE_ID" \
-  --password "$APPLE_ID_PASSWORD" \
+  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
   --team-id "$APPLE_TEAM_ID"
 ```
 

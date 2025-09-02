@@ -14,7 +14,7 @@ on:
 env:
   # Mask sensitive values in logs
   APPLE_ID: ${{ secrets.APPLE_ID }}
-  APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+  APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
   APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
   APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
   APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -72,6 +72,22 @@ jobs:
       - name: Build application
         run: pnpm run build
 
+      - name: Fix entitlements file permissions
+        run: |
+          # Ensure entitlements file exists and has correct permissions
+          if [ -f "build/entitlements.mac.plist" ]; then
+            echo "Setting permissions for entitlements.mac.plist"
+            chmod 644 build/entitlements.mac.plist
+            
+            echo "Validating entitlements.mac.plist syntax"
+            plutil -lint build/entitlements.mac.plist
+            
+            echo "✅ Entitlements file validated successfully"
+          else
+            echo "❌ ERROR: build/entitlements.mac.plist not found"
+            exit 1
+          fi
+
       - name: Import Apple certificate
         run: |
           if [ -n "$APPLE_CERTIFICATE" ]; then
@@ -81,15 +97,15 @@ jobs:
             KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
             KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
             
-            # Decode certificate from base64
-            echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+            # Decode certificate from base64 (secure method)
+            echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
             
             # Create temporary keychain
             security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
             security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
             
-            # Import certificate
+            # Import certificate (GitHub Actions masks the password in logs)
             security import certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
             security list-keychain -d user -s $KEYCHAIN_PATH login.keychain-db
             security default-keychain -s $KEYCHAIN_PATH
@@ -135,9 +151,9 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$APPLE_ID_PASSWORD" ]; then
-            echo "❌ ERROR: APPLE_ID_PASSWORD secret이 설정되지 않았습니다."
-            echo "macOS 노타리제이션을 위해 APPLE_ID_PASSWORD secret을 설정해주세요."
+          if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]; then
+            echo "❌ ERROR: APPLE_APP_SPECIFIC_PASSWORD secret이 설정되지 않았습니다."
+            echo "macOS 노타리제이션을 위해 APPLE_APP_SPECIFIC_PASSWORD secret을 설정해주세요."
             exit 1
           fi
 
@@ -155,6 +171,13 @@ jobs:
           # Check if certificate was imported (suppress sensitive output)
           if security find-identity -p codesigning | grep -q "Developer ID Application" 2>/dev/null; then
             echo "Certificate found, building with code signing and notarization"
+
+            # Debug: Check environment variables before building (completely safe - no values exposed)
+            echo "Environment variables for notarization:"
+            if [ -n "$APPLE_ID" ]; then echo "  APPLE_ID: ***SET***"; else echo "  APPLE_ID: NOT_SET"; fi
+            if [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ]; then echo "  APPLE_APP_SPECIFIC_PASSWORD: ***SET***"; else echo "  APPLE_APP_SPECIFIC_PASSWORD: NOT_SET"; fi
+            if [ -n "$APPLE_TEAM_ID" ]; then echo "  APPLE_TEAM_ID: ***SET***"; else echo "  APPLE_TEAM_ID: NOT_SET"; fi
+            echo "  CI: $CI"
 
             # Build and sign
             pnpm run package:mac
