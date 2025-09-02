@@ -149,23 +149,6 @@ jobs:
 
           echo "✅ macOS 코드 사이닝 및 노타리제이션 secrets가 모두 설정되었습니다."
         shell: bash
-
-      - name: Fix entitlements file permissions
-        run: |
-          # Ensure entitlements file exists and has correct permissions
-          if [ -f "build/entitlements.mac.plist" ]; then
-            echo "Setting permissions for entitlements.mac.plist"
-            chmod 644 build/entitlements.mac.plist
-            
-            echo "Validating entitlements.mac.plist syntax"
-            plutil -lint build/entitlements.mac.plist
-            
-            echo "✅ Entitlements file validated successfully"
-          else
-            echo "❌ ERROR: build/entitlements.mac.plist not found"
-            exit 1
-          fi
-
       - name: Package application
         run: |
           # Check if certificate was imported (suppress sensitive output)
