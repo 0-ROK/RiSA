@@ -33,3 +33,6 @@ release/
 # Temporary files
 tmp/
 temp/
+
+# Generated GitHub Pages
+_site/
