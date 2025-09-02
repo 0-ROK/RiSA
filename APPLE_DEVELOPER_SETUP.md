@@ -20,10 +20,29 @@
 
 ### 1.2 또는 developer.apple.com에서 직접 생성
 
+#### 1.2.1 CSR 파일 생성
+
+```bash
+# 키체인 접근 앱 실행
+open "/Applications/Utilities/Keychain Access.app"
+```
+
+1. **키체인 접근** → 메뉴바 `키체인 접근` → `인증서 지원` → `인증 기관에서 인증서 요청...`
+2. 다음 정보 입력:
+   - **사용자 이메일 주소**: Apple Developer 계정 이메일
+   - **일반 이름**: 본인 이름 또는 회사명
+   - **CA 이메일 주소**: 비워둠
+   - **요청**: `디스크에 저장됨` 선택
+   - **본인이 키 쌍 정보 지정** 체크
+3. **계속** → 저장 위치 선택 (예: `CertificateSigningRequest.certSigningRequest`)
+4. 키 크기 `2048비트`, 알고리즘 `RSA` 선택 → **계속**
+
+#### 1.2.2 Apple Developer에서 인증서 생성
+
 1. [Apple Developer](https://developer.apple.com) 로그인
 2. `Certificates, Identifiers & Profiles` → `Certificates`
 3. **+** 버튼 → `Developer ID Application`
-4. CSR 파일 업로드 후 인증서 다운로드
+4. 위에서 생성한 CSR 파일 업로드 후 인증서 다운로드
 5. 다운로드한 `.cer` 파일을 더블클릭하여 키체인에 추가
 
 ## 2️⃣ 인증서 내보내기
@@ -66,14 +85,17 @@ security export -k login.keychain -t identities -f pkcs12 -o certificate.p12 -P 
 #### 문제 해결
 
 **"개인 키가 보이지 않음"**
+
 - Xcode → Preferences → Accounts → Download Manual Profiles
 - 또는 developer.apple.com에서 인증서를 다시 다운로드
 
 **"내보내기가 비활성화됨"**
+
 - 인증서와 개인 키가 같은 키체인에 있는지 확인
 - 키체인이 잠겨있지 않은지 확인
 
 **"비밀번호 오류"**
+
 - 키체인 비밀번호와 p12 내보내기 비밀번호는 다름
 - p12 비밀번호는 새로 설정하는 것
 
@@ -99,22 +121,28 @@ GitHub Repository → Settings → Secrets and variables → Actions
 ### 4.2 필수 Secrets 추가
 
 #### `APPLE_CERTIFICATE`
+
 ```bash
 # .p12 파일을 Base64로 인코딩
 base64 -i /path/to/certificate.p12 | pbcopy
 ```
+
 - 출력된 Base64 문자열을 GitHub Secret으로 추가
 
 #### `APPLE_CERTIFICATE_PASSWORD`
+
 - .p12 파일 생성 시 설정한 비밀번호
 
 #### `APPLE_ID`
+
 - Apple Developer 계정 이메일 주소
 
 #### `APPLE_ID_PASSWORD`
+
 - 3단계에서 생성한 앱 전용 비밀번호
 
 #### `APPLE_TEAM_ID`
+
 ```bash
 # 팀 ID 확인 방법 1: Xcode
 # Xcode → Preferences → Accounts → Team ID 확인
@@ -122,9 +150,11 @@ base64 -i /path/to/certificate.p12 | pbcopy
 # 팀 ID 확인 방법 2: 인증서에서
 security find-identity -v -p codesigning | grep "Developer ID Application"
 ```
+
 - 10자리 영숫자 조합 (예: `M4NJ645XSJ`)
 
 #### `APPLE_KEYCHAIN_PASSWORD`
+
 - GitHub Actions에서 사용할 임시 키체인 비밀번호
 - 아무 강력한 비밀번호나 설정 (예: 랜덤 문자열)
 
@@ -159,16 +189,19 @@ git push origin v0.1.6
 ### 일반적인 오류와 해결책
 
 #### "unable to build chain to self-signed root"
+
 - 인증서 체인 문제
 - Apple Intermediate 인증서 다운로드 필요
 - [Apple PKI](https://www.apple.com/certificateauthority/) 페이지에서 다운로드
 
 #### "notarization failed"
+
 - Apple ID 또는 앱 전용 비밀번호 확인
 - 팀 ID 정확성 확인
 - 2FA 활성화 여부 확인
 
 #### "entitlements not valid"
+
 - `build/entitlements.mac.plist` 파일 권한 확인
 - 불필요한 권한 제거
 
@@ -191,12 +224,14 @@ xcrun notarytool info <submission-id> \
 ## 7️⃣ 보안 모범 사례
 
 ### ✅ 권장사항
+
 - 2FA 활성화 필수
 - 앱 전용 비밀번호 사용 (실제 Apple ID 비밀번호 금지)
 - .p12 파일 안전한 곳에 백업
 - 정기적인 인증서 갱신 (1년마다)
 
 ### ❌ 금지사항
+
 - GitHub에 인증서 파일 커밋
 - 실제 Apple ID 비밀번호 사용
 - 인증서 파일 공유
@@ -205,6 +240,7 @@ xcrun notarytool info <submission-id> \
 ## 🎉 완료 후 확인사항
 
 설정이 완료되면:
+
 - ✅ 태그 푸시 시 자동 서명
 - ✅ Apple 공증 통과
 - ✅ macOS 사용자가 경고 없이 실행 가능
