@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# GitHub Pages 생성 스크립트
+# === GitHub Pages 생성 스크립트 ===
+# 2단계 빌드/배포 아키텍처의 3단계: 다운로드 랜딩 페이지 생성
+# GitHub API에서 실제 릴리즈 정보를 가져와서 다운로드 링크 생성
 set -e
 
 TAG_NAME="${1:-v0.1.0}"
@@ -11,12 +13,15 @@ echo "Generating GitHub Pages for tag: $TAG_NAME"
 # 출력 디렉토리 생성
 mkdir -p _site
 
-# GitHub API에서 릴리즈 정보 가져오기
+# === GitHub API에서 실제 릴리즈 정보 가져오기 ===
+# 파일명 불일치 문제를 해결하는 핵심: GitHub API의 실제 다운로드 링크 사용
 echo "Fetching release assets from GitHub API..."
 RELEASE_DATA=$(curl -s "https://api.github.com/repos/$REPOSITORY/releases/tags/$TAG_NAME")
 
 # 릴리즈가 존재하는지 확인
 if echo "$RELEASE_DATA" | jq -e '.assets' > /dev/null 2>&1; then
+  # 실제 존재하는 파일들의 다운로드 링크를 추출
+  # browser_download_url이 핵심: GitHub이 제공하는 실제 다운로드 경로
   ASSETS=$(echo "$RELEASE_DATA" | jq '.assets | map({name: .name, download_url: .browser_download_url, size: .size, download_count: .download_count})')
   echo "Found $(echo "$ASSETS" | jq length) assets"
 else

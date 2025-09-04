@@ -59,7 +59,9 @@ const createWindow = (): void => {
   });
 };
 
-// Auto Updater 설정
+// === Auto Updater 설정 ===
+// GitHub Releases에서 업데이트 확인 및 다운로드
+// 연동: GitHub Actions → GitHub Releases → electron-updater → 사용자 앱
 const setupAutoUpdater = (): void => {
   autoUpdater.setFeedURL({
     provider: 'github',

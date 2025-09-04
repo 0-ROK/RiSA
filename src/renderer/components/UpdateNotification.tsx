@@ -54,14 +54,17 @@ const UpdateNotification: React.FC = () => {
   }, []);
 
   const handleDownloadUpdate = () => {
-    // 다운로드 시작 요청
+    // === 자동 다운로드 ===
+    // electron-updater가 GitHub Releases에서 직접 다운로드
     window.electronAPI.startDownload?.();
     setUpdateAvailable(null);
     // 다운로드 진행 상황은 onDownloadProgress로 추적됨
   };
 
   const handleManualDownload = () => {
-    // 수동 다운로드를 위해 GitHub releases 페이지로 이동
+    // === 수동 다운로드 (Fallback) ===
+    // 자동 다운로드 실패 시 랜딩 페이지로 이동
+    // 랜딩 페이지는 GitHub Pages에서 실제 다운로드 링크를 가져와 표시
     const repoUrl = 'https://0-rok.github.io/RiSA';
     window.open(repoUrl, '_blank');
     setUpdateAvailable(null);

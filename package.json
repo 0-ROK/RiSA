@@ -14,6 +14,7 @@
     "start": "npm run build && npm run electron",
     "package": "npm run build && electron-builder",
     "package:mac": "npm run build && electron-builder --mac",
+    "package:gh-action": "npm run build && electron-builder --mac --publish never",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

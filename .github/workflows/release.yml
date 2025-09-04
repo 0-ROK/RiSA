@@ -29,6 +29,8 @@ permissions:
   contents: write
 
 jobs:
+  # === 2단계 빌드/배포 아키텍처 ===
+  # Job 1: Build - 앱 빌드 및 코드사이닝만 수행
   build:
     runs-on: macos-latest
 
@@ -162,8 +164,10 @@ jobs:
             if [ -n "$APPLE_TEAM_ID" ]; then echo "  APPLE_TEAM_ID: ***SET***"; else echo "  APPLE_TEAM_ID: NOT_SET"; fi
             echo "  CI: $CI"
 
-            # Build and sign
-            pnpm run package:mac
+            # === 2단계 빌드/배포 아키텍처 - 1단계: 빌드만 ===
+            # 빌드만 수행하고 GitHub 배포는 하지 않음 (--publish never)
+            # 2단계에서 별도 액션(softprops/action-gh-release)이 배포 담당
+            pnpm run package:gh-action
 
             # Verify signing (minimal output to avoid exposing sensitive info)
             echo "Verifying code signature..."
@@ -196,6 +200,7 @@ jobs:
             **/*.zip
           retention-days: 5
 
+  # Job 2: Release - 빌드된 파일들을 GitHub Releases에 배포
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -234,6 +239,10 @@ jobs:
           done | jq -s . >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      # === 2단계 빌드/배포 아키텍처 - 2단계: 배포만 ===
+      # 1단계에서 생성된 파일들을 GitHub Releases에 배포
+      # electron-builder 대신 GitHub Actions 전용 액션 사용
+      # 장점: 더 안정적, 유연한 배포 옵션, 자동 릴리즈 노트 생성
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -247,6 +256,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Job 3: Deploy Pages - 다운로드 랜딩 페이지 생성 및 배포
   deploy-pages:
     if: always()
     needs: release
