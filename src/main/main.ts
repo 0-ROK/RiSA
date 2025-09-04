@@ -67,8 +67,17 @@ const setupAutoUpdater = (): void => {
     repo: 'RiSA'
   });
 
-  // 업데이트 확인
-  autoUpdater.checkForUpdatesAndNotify();
+  // electron-updater가 package.json의 version과 파일명을 매칭하도록 설정
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.allowPrerelease = false;
+
+  // 업데이트 자동 다운로드 비활성화 (사용자 선택권 제공)
+  autoUpdater.autoDownload = false;
+
+  // 업데이트 확인 (앱 시작 후 약간의 지연을 두어 안정성 향상)
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 3000);
 
   // 업데이트 이벤트 리스너
   autoUpdater.on('checking-for-update', () => {
@@ -80,6 +89,7 @@ const setupAutoUpdater = (): void => {
     if (mainWindow) {
       mainWindow.webContents.send('update-available', info);
     }
+    // 수동으로 다운로드 시작 (사용자가 "자동 다운로드" 버튼을 클릭했을 때 시작됨)
   });
 
   autoUpdater.on('update-not-available', (info) => {
@@ -88,6 +98,9 @@ const setupAutoUpdater = (): void => {
 
   autoUpdater.on('error', (err) => {
     console.error('업데이트 오류:', err);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-error', err.message || '업데이트 중 알 수 없는 오류가 발생했습니다.');
+    }
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
@@ -436,6 +449,10 @@ ipcMain.handle(IPC_CHANNELS.CHECK_FOR_UPDATES, () => {
 
 ipcMain.handle(IPC_CHANNELS.RESTART_AND_INSTALL, () => {
   autoUpdater.quitAndInstall();
+});
+
+ipcMain.handle(IPC_CHANNELS.START_DOWNLOAD, () => {
+  autoUpdater.downloadUpdate();
 });
 
 // History management

@@ -40,6 +40,9 @@ const electronAPI = {
   restartAndInstall: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.RESTART_AND_INSTALL),
 
+  startDownload: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.START_DOWNLOAD),
+
   // Update event listeners
   onUpdateAvailable: (callback: (info: any) => void) => {
     ipcRenderer.on('update-available', (_event, info) => callback(info));
@@ -51,6 +54,10 @@ const electronAPI = {
 
   onUpdateDownloaded: (callback: (info: any) => void) => {
     ipcRenderer.on('update-downloaded', (_event, info) => callback(info));
+  },
+
+  onUpdateError: (callback: (error: string) => void) => {
+    ipcRenderer.on('update-error', (_event, error) => callback(error));
   },
 
   // History management
@@ -71,6 +78,7 @@ const electronAPI = {
     ipcRenderer.removeAllListeners('update-available');
     ipcRenderer.removeAllListeners('download-progress');
     ipcRenderer.removeAllListeners('update-downloaded');
+    ipcRenderer.removeAllListeners('update-error');
   },
 };
 

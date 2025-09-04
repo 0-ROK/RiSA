@@ -21,6 +21,7 @@ const UpdateNotification: React.FC = () => {
   const [updateAvailable, setUpdateAvailable] = useState<UpdateInfo | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [updateDownloaded, setUpdateDownloaded] = useState<UpdateInfo | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -37,6 +38,13 @@ const UpdateNotification: React.FC = () => {
     window.electronAPI.onUpdateDownloaded((info: UpdateInfo) => {
       setUpdateDownloaded(info);
       setDownloadProgress(null);
+      setUpdateError(null);
+    });
+
+    // 업데이트 에러 핸들링
+    window.electronAPI.onUpdateError?.((error: string) => {
+      setUpdateError(error);
+      setDownloadProgress(null);
     });
 
     // 컴포넌트 언마운트 시 이벤트 리스너 제거
@@ -46,6 +54,16 @@ const UpdateNotification: React.FC = () => {
   }, []);
 
   const handleDownloadUpdate = () => {
+    // 다운로드 시작 요청
+    window.electronAPI.startDownload?.();
+    setUpdateAvailable(null);
+    // 다운로드 진행 상황은 onDownloadProgress로 추적됨
+  };
+
+  const handleManualDownload = () => {
+    // 수동 다운로드를 위해 GitHub releases 페이지로 이동
+    const repoUrl = 'https://0-rok.github.io/RiSA';
+    window.open(repoUrl, '_blank');
     setUpdateAvailable(null);
   };
 
@@ -72,10 +90,18 @@ const UpdateNotification: React.FC = () => {
           </Space>
         }
         open={!!updateAvailable}
-        onOk={handleDownloadUpdate}
+        footer={[
+          <Button key="manual" onClick={handleManualDownload}>
+            수동 다운로드
+          </Button>,
+          <Button key="cancel" onClick={() => setUpdateAvailable(null)}>
+            나중에
+          </Button>,
+          <Button key="auto" type="primary" onClick={handleDownloadUpdate}>
+            자동 다운로드
+          </Button>
+        ]}
         onCancel={() => setUpdateAvailable(null)}
-        okText="다운로드"
-        cancelText="나중에"
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <Text>새로운 버전이 사용 가능합니다!</Text>
@@ -112,8 +138,8 @@ const UpdateNotification: React.FC = () => {
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <Text>업데이트를 다운로드하고 있습니다...</Text>
-          <Progress 
-            percent={Math.round(downloadProgress?.percent || 0)} 
+          <Progress
+            percent={Math.round(downloadProgress?.percent || 0)}
             status="active"
           />
           {downloadProgress && (
@@ -152,6 +178,29 @@ const UpdateNotification: React.FC = () => {
           <Text type="secondary">
             업데이트를 적용하려면 앱을 재시작해야 합니다.
           </Text>
+        </Space>
+      </Modal>
+
+      {/* 업데이트 에러 알림 */}
+      <Modal
+        title="업데이트 오류"
+        open={!!updateError}
+        footer={[
+          <Button key="manual" type="primary" onClick={handleManualDownload}>
+            수동 다운로드
+          </Button>,
+          <Button key="close" onClick={() => setUpdateError(null)}>
+            닫기
+          </Button>
+        ]}
+        onCancel={() => setUpdateError(null)}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text type="danger">자동 업데이트 중 오류가 발생했습니다.</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            {updateError}
+          </Text>
+          <Text>아래 버튼을 클릭하여 수동으로 다운로드할 수 있습니다.</Text>
         </Space>
       </Modal>
     </>

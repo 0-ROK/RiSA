@@ -44,4 +44,5 @@ export const IPC_CHANNELS = {
   // Auto updater
   CHECK_FOR_UPDATES: 'check-for-updates',
   RESTART_AND_INSTALL: 'restart-and-install',
+  START_DOWNLOAD: 'start-download',
 } as const;
