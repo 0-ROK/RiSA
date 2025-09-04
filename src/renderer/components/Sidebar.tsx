@@ -1,9 +1,10 @@
 import React from 'react';
 import { Layout, Menu, Typography } from 'antd';
-import { 
-  LockOutlined, 
+import {
+  LockOutlined,
   KeyOutlined,
-  HomeOutlined 
+  HomeOutlined,
+  HistoryOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -25,6 +26,11 @@ const Sidebar: React.FC = () => {
       icon: <KeyOutlined />,
       label: '키 관리',
     },
+    {
+      key: '/history',
+      icon: <HistoryOutlined />,
+      label: '히스토리',
+    },
   ];
 
   const handleMenuClick = ({ key }: { key: string }) => {
@@ -39,31 +45,31 @@ const Sidebar: React.FC = () => {
         height: '100vh',
       }}
     >
-      <div style={{ 
-        padding: '16px', 
+      <div style={{
+        padding: '16px',
         borderBottom: '1px solid #303030',
         textAlign: 'center'
       }}>
         <LockOutlined style={{ fontSize: '24px', color: '#1890ff', marginRight: 8 }} />
-        <Title 
-          level={4} 
-          style={{ 
-            color: 'white', 
-            margin: 0, 
-            display: 'inline-block' 
+        <Title
+          level={4}
+          style={{
+            color: 'white',
+            margin: 0,
+            display: 'inline-block'
           }}
         >
           RiSA
         </Title>
       </div>
-      
+
       <Menu
         theme="dark"
         mode="inline"
         selectedKeys={[location.pathname]}
         items={menuItems}
         onClick={handleMenuClick}
-        style={{ 
+        style={{
           borderRight: 0,
           paddingTop: '16px'
         }}

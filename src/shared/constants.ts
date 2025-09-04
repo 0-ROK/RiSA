@@ -25,16 +25,22 @@ export const IPC_CHANNELS = {
   SAVE_KEY: 'save-key',
   DELETE_KEY: 'delete-key',
   GENERATE_RSA_KEYS: 'generate-rsa-keys',
-  
+
   // Encryption/Decryption
   ENCRYPT_TEXT: 'encrypt-text',
   DECRYPT_TEXT: 'decrypt-text',
-  
+
   // File operations
   SELECT_FILE: 'select-file',
   EXPORT_KEY: 'export-key',
   IMPORT_KEY: 'import-key',
-  
+
+  // History management
+  GET_HISTORY: 'get-history',
+  SAVE_HISTORY_ITEM: 'save-history-item',
+  DELETE_HISTORY_ITEM: 'delete-history-item',
+  CLEAR_HISTORY: 'clear-history',
+
   // Auto updater
   CHECK_FOR_UPDATES: 'check-for-updates',
   RESTART_AND_INSTALL: 'restart-and-install',

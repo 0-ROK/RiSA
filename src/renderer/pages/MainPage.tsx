@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  Tabs, 
-  Input, 
-  Button, 
-  Space, 
-  Typography, 
+import {
+  Card,
+  Tabs,
+  Input,
+  Button,
+  Space,
+  Typography,
   message,
   Row,
   Col,
@@ -14,9 +14,9 @@ import {
   Modal,
   notification
 } from 'antd';
-import { 
-  LockOutlined, 
-  UnlockOutlined, 
+import {
+  LockOutlined,
+  UnlockOutlined,
   CopyOutlined,
   ClearOutlined,
   KeyOutlined,
@@ -27,7 +27,9 @@ import {
   CloseCircleOutlined
 } from '@ant-design/icons';
 import { useKeys } from '../store/KeyContext';
+import { useHistory } from '../store/HistoryContext';
 import { DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
+import { HistoryItem } from '../../shared/types';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 
 const { TextArea } = Input;
@@ -36,6 +38,7 @@ const { TabPane } = Tabs;
 
 const MainPage: React.FC = () => {
   const { keys, selectedKey, selectKey } = useKeys();
+  const { saveHistoryItem } = useHistory();
   const [encryptText, setEncryptText] = useState('');
   const [encryptedResult, setEncryptedResult] = useState('');
   const [decryptText, setDecryptText] = useState('');
@@ -55,7 +58,7 @@ const MainPage: React.FC = () => {
   useEffect(() => {
     const key = keys.find(k => k.id === selectedKeyId);
     selectKey(key || null);
-    
+
     // 키의 선호 알고리즘이 있으면 자동 설정
     if (key && key.preferredAlgorithm) {
       setAlgorithm(key.preferredAlgorithm);
@@ -81,13 +84,33 @@ const MainPage: React.FC = () => {
     setEncryptionStatus('idle');
     try {
       const result = await window.electronAPI.encryptText(
-        encryptText, 
+        encryptText,
         selectedKey.publicKey,
         algorithm
       );
       setEncryptedResult(result.data);
       setEncryptionStatus('success');
       message.success('암호화가 완료되었습니다.');
+
+      // 히스토리에 저장
+      const historyItem: HistoryItem = {
+        id: crypto.randomUUID(),
+        type: 'encrypt',
+        keyId: selectedKey.id,
+        keyName: selectedKey.name,
+        algorithm: algorithm as 'RSA-OAEP' | 'RSA-PKCS1',
+        inputText: encryptText,
+        outputText: result.data,
+        success: true,
+        timestamp: new Date(),
+        keySize: selectedKey.keySize,
+      };
+
+      try {
+        await saveHistoryItem(historyItem);
+      } catch (error) {
+        console.error('Failed to save history:', error);
+      }
     } catch (error) {
       setEncryptionStatus('error');
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
@@ -101,7 +124,7 @@ const MainPage: React.FC = () => {
 • 키와 알고리즘이 호환되는지 확인`;
 
       setEncryptedResult(helpMessage);
-      
+
       notification.error({
         message: '암호화 실패',
         description: `암호화 중 오류가 발생했습니다: ${errorMessage}`,
@@ -134,7 +157,7 @@ const MainPage: React.FC = () => {
     const validation = validateBase64Format(decryptText);
     if (!validation.isValid) {
       setDecryptionStatus('error');
-      
+
       // Base64 검증 실패 시 도움말 문구
       const base64HelpMessage = `❌ 입력 데이터 오류
 
@@ -142,7 +165,7 @@ const MainPage: React.FC = () => {
 • 앞뒤 공백이나 불필요한 문자 제거`;
 
       setDecryptedResult(base64HelpMessage);
-      
+
       notification.error({
         message: '입력 데이터 오류',
         description: (
@@ -165,7 +188,7 @@ const MainPage: React.FC = () => {
     setDecryptionStatus('idle');
     try {
       const result = await window.electronAPI.decryptText(
-        decryptText, 
+        decryptText,
         selectedKey.privateKey,
         algorithm
       );
@@ -174,15 +197,15 @@ const MainPage: React.FC = () => {
       message.success('복호화가 완료되었습니다.');
     } catch (error) {
       setDecryptionStatus('error');
-      
+
       // 실패 시 도움말 문구 설정
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       setLastError(errorMessage);
-      
+
       // 오류 타입에 따른 구체적인 가이드 제공
       let helpText = '';
       let errorCategory = '복호화 오류';
-      
+
       if (errorMessage.includes('입력 데이터 검증 실패') || errorMessage.includes('Base64')) {
         errorCategory = 'Base64 형식 오류';
         helpText = '암호화된 데이터가 올바른 Base64 형식인지 확인해주세요. 복사 중 일부 문자가 누락되거나 추가되었을 수 있습니다.';
@@ -211,7 +234,7 @@ const MainPage: React.FC = () => {
 • 암호화 데이터가 완전히 복사되었는지 확인`;
 
       setDecryptedResult(helpMessage);
-      
+
       notification.error({
         message: errorCategory,
         description: (
@@ -229,6 +252,29 @@ const MainPage: React.FC = () => {
         style: { width: 400 },
       });
       console.error('Decryption error:', error);
+
+      // 복호화 실패 히스토리 저장
+      if (selectedKey) {
+        const failedHistoryItem: HistoryItem = {
+          id: crypto.randomUUID(),
+          type: 'decrypt',
+          keyId: selectedKey.id,
+          keyName: selectedKey.name,
+          algorithm: algorithm as 'RSA-OAEP' | 'RSA-PKCS1',
+          inputText: decryptText,
+          outputText: '',
+          success: false,
+          errorMessage: errorMessage,
+          timestamp: new Date(),
+          keySize: selectedKey.keySize,
+        };
+
+        try {
+          await saveHistoryItem(failedHistoryItem);
+        } catch (historyError) {
+          console.error('Failed to save failed decryption history:', historyError);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -237,14 +283,14 @@ const MainPage: React.FC = () => {
   const handleCopy = async (text: string, type?: 'encrypted' | 'decrypted' | 'key') => {
     try {
       await navigator.clipboard.writeText(text);
-      
+
       // 복사된 내용의 종류와 크기에 따른 맞춤 알림
       const size = text.length;
-      const sizeText = size > 1000 ? `${Math.round(size/1000)}KB` : `${size}자`;
-      
+      const sizeText = size > 1000 ? `${Math.round(size / 1000)}KB` : `${size}자`;
+
       let description = '';
       let title = '';
-      
+
       if (type === 'encrypted') {
         title = '암호화 결과 복사됨';
         description = `${sizeText}의 암호화된 데이터가 클립보드에 복사되었습니다.`;
@@ -258,7 +304,7 @@ const MainPage: React.FC = () => {
         title = '클립보드에 복사됨';
         description = `${sizeText}의 데이터가 복사되었습니다.`;
       }
-      
+
       notification.success({
         message: title,
         description,
@@ -266,7 +312,7 @@ const MainPage: React.FC = () => {
         placement: 'topRight',
         duration: 3,
       });
-      
+
     } catch (error) {
       notification.error({
         message: '복사 실패',
@@ -296,7 +342,7 @@ const MainPage: React.FC = () => {
     if (type === 'encrypt') content = encryptText;
     else if (type === 'decrypt') content = decryptText;
     else if (type === 'result') content = encryptedResult || decryptedResult;
-    
+
     setFullScreenType(type);
     setFullScreenContent(content);
     setFullScreenModalVisible(true);
@@ -320,23 +366,23 @@ const MainPage: React.FC = () => {
     try {
       // 공백 제거
       const cleanData = data.trim().replace(/\s/g, '');
-      
+
       // 빈 문자열 체크
       if (!cleanData) {
         return { isValid: false, error: '데이터가 비어있습니다.' };
       }
-      
+
       // Base64 기본 문자 집합 검증 (A-Z, a-z, 0-9, +, /, =)
       const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
       if (!base64Regex.test(cleanData)) {
         return { isValid: false, error: 'Base64 형식이 아닙니다. 올바른 문자(A-Z, a-z, 0-9, +, /, =)만 사용해주세요.' };
       }
-      
+
       // 길이 검증 (Base64는 4의 배수여야 함)
       if (cleanData.length % 4 !== 0) {
         return { isValid: false, error: 'Base64 데이터 길이가 올바르지 않습니다. 4의 배수여야 합니다.' };
       }
-      
+
       // 패딩 검증
       const paddingIndex = cleanData.indexOf('=');
       if (paddingIndex !== -1) {
@@ -351,7 +397,7 @@ const MainPage: React.FC = () => {
           return { isValid: false, error: 'Base64 패딩(=)의 위치가 올바르지 않습니다.' };
         }
       }
-      
+
       // 실제 Base64 디코딩 테스트
       try {
         // 브라우저 내장 atob 함수로 검증
@@ -359,14 +405,14 @@ const MainPage: React.FC = () => {
       } catch (decodeError) {
         return { isValid: false, error: 'Base64 디코딩에 실패했습니다. 데이터가 손상되었을 수 있습니다.' };
       }
-      
+
       // RSA 암호화 데이터는 보통 최소한의 길이를 가져야 함
       if (cleanData.length < 100) {
         return { isValid: false, error: 'RSA 암호화 데이터로는 너무 짧습니다.' };
       }
-      
+
       return { isValid: true };
-      
+
     } catch (error) {
       return { isValid: false, error: '데이터 검증 중 오류가 발생했습니다.' };
     }
@@ -413,23 +459,23 @@ const MainPage: React.FC = () => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // 기본 조건 확인
       if (loading) {
         return;
       }
-      
+
       if (!selectedKey) {
         message.error('먼저 키를 선택해주세요.');
         return;
       }
-      
+
       const hasInputText = type === 'encrypt' ? encryptText.trim() : decryptText.trim();
       if (!hasInputText) {
         message.error(`${type === 'encrypt' ? '암호화' : '복호화'}할 텍스트를 입력해주세요.`);
         return;
       }
-      
+
       // 실행
       if (type === 'encrypt') {
         handleEncrypt();
@@ -444,11 +490,11 @@ const MainPage: React.FC = () => {
     const isEncryptTab = activeTab === 'encrypt';
     const hasInputText = isEncryptTab ? encryptText.trim() : decryptText.trim();
     const canExecute = selectedKey && hasInputText && !loading;
-    
+
     return (
       <Space>
-        <Button 
-          type="primary" 
+        <Button
+          type="primary"
           icon={isEncryptTab ? <LockOutlined /> : <UnlockOutlined />}
           loading={loading}
           onClick={isEncryptTab ? handleEncrypt : handleDecrypt}
@@ -457,7 +503,7 @@ const MainPage: React.FC = () => {
         >
           {isEncryptTab ? '암호화' : '복호화'}
         </Button>
-        <Button 
+        <Button
           icon={<ClearOutlined />}
           onClick={() => handleClear(isEncryptTab ? 'encrypt' : 'decrypt')}
           disabled={loading}
@@ -470,15 +516,15 @@ const MainPage: React.FC = () => {
   };
 
   return (
-    <div style={{ 
-      padding: '24px', 
+    <div style={{
+      padding: '24px',
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden'
     }}>
-      <div style={{ 
-        maxWidth: 1200, 
+      <div style={{
+        maxWidth: 1200,
         margin: '0 auto',
         width: '100%',
         display: 'flex',
@@ -486,7 +532,7 @@ const MainPage: React.FC = () => {
         height: '100%'
       }}>
         <Title level={2} style={{ marginBottom: '16px', flexShrink: 0 }}>RSA 암호화/복호화</Title>
-        
+
         {/* 키 선택 및 알고리즘 선택 섹션 */}
         <Card style={{ marginBottom: 16, flexShrink: 0 }}>
           <Row gutter={[16, 16]} align="top">
@@ -512,7 +558,7 @@ const MainPage: React.FC = () => {
                 </Select>
               </Space>
             </Col>
-            
+
             <Col xs={24} md={8}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Text strong>암호화 알고리즘</Text>
@@ -523,14 +569,14 @@ const MainPage: React.FC = () => {
                 />
               </Space>
             </Col>
-            
+
             <Col xs={24} md={8}>
               {selectedKey && (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Text strong>선택된 키 정보</Text>
-                  <div style={{ 
-                    padding: '8px 12px', 
-                    backgroundColor: '#f0f2f5', 
+                  <div style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#f0f2f5',
                     borderRadius: '4px',
                     fontSize: '12px'
                   }}>
@@ -558,7 +604,7 @@ const MainPage: React.FC = () => {
                   style={{ marginBottom: keys.length === 0 ? 12 : 0 }}
                 />
               )}
-              
+
               {keys.length === 0 && (
                 <Alert
                   message="키가 없습니다"
@@ -570,10 +616,10 @@ const MainPage: React.FC = () => {
             </div>
           )}
         </Card>
-        
+
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          <Tabs 
-            defaultActiveKey="encrypt" 
+          <Tabs
+            defaultActiveKey="encrypt"
             activeKey={activeTab}
             onChange={setActiveTab}
             size="large"
@@ -592,14 +638,14 @@ const MainPage: React.FC = () => {
                   <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
                     <Row gutter={24} style={{ height: '100%' }}>
                       <Col span={12} style={{ height: '100%' }}>
-                        <Card 
-                          title="입력" 
-                          style={{ 
+                        <Card
+                          title="입력"
+                          style={{
                             height: '100%',
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{ 
+                          bodyStyle={{
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
@@ -626,7 +672,7 @@ const MainPage: React.FC = () => {
                               onChange={(e) => setEncryptText(e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, 'encrypt')}
                               placeholder="암호화할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 암호화)"
-                              style={{ 
+                              style={{
                                 flex: 1,
                                 resize: 'none',
                                 maxHeight: 'calc(100vh - 400px)',
@@ -636,16 +682,16 @@ const MainPage: React.FC = () => {
                           </div>
                         </Card>
                       </Col>
-                      
+
                       <Col span={12} style={{ height: '100%' }}>
-                        <Card 
-                          title="결과" 
-                          style={{ 
+                        <Card
+                          title="결과"
+                          style={{
                             height: '100%',
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{ 
+                          bodyStyle={{
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
@@ -702,14 +748,14 @@ const MainPage: React.FC = () => {
                   <div style={{ height: 'calc(100vh - 280px)', overflow: 'hidden' }}>
                     <Row gutter={24} style={{ height: '100%' }}>
                       <Col span={12} style={{ height: '100%' }}>
-                        <Card 
-                          title="입력" 
-                          style={{ 
+                        <Card
+                          title="입력"
+                          style={{
                             height: '100%',
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{ 
+                          bodyStyle={{
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
@@ -736,7 +782,7 @@ const MainPage: React.FC = () => {
                               onChange={(e) => setDecryptText(e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, 'decrypt')}
                               placeholder="복호화할 암호화된 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 복호화)"
-                              style={{ 
+                              style={{
                                 flex: 1,
                                 fontFamily: 'monospace',
                                 resize: 'none',
@@ -747,16 +793,16 @@ const MainPage: React.FC = () => {
                           </div>
                         </Card>
                       </Col>
-                      
+
                       <Col span={12} style={{ height: '100%' }}>
-                        <Card 
-                          title="결과" 
-                          style={{ 
+                        <Card
+                          title="결과"
+                          style={{
                             height: '100%',
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{ 
+                          bodyStyle={{
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
@@ -805,19 +851,19 @@ const MainPage: React.FC = () => {
           />
         </div>
       </div>
-      
+
       {/* 전체 화면 편집 모달 */}
       <Modal
         title={
           fullScreenType === 'encrypt' ? '암호화할 텍스트 편집' :
-          fullScreenType === 'decrypt' ? '복호화할 텍스트 편집' :
-          '결과 보기'
+            fullScreenType === 'decrypt' ? '복호화할 텍스트 편집' :
+              '결과 보기'
         }
         open={fullScreenModalVisible}
         onCancel={() => setFullScreenModalVisible(false)}
         width="90vw"
         style={{ top: 20 }}
-        bodyStyle={{ 
+        bodyStyle={{
           height: 'calc(100vh - 200px)',
           padding: '24px'
         }}
@@ -830,9 +876,9 @@ const MainPage: React.FC = () => {
               저장
             </Button>
           ] : [
-            <Button 
-              key="copy" 
-              icon={<CopyOutlined />} 
+            <Button
+              key="copy"
+              icon={<CopyOutlined />}
               onClick={() => {
                 const type = activeTab === 'encrypt' ? 'encrypted' : 'decrypted';
                 handleCopy(fullScreenContent, type);
@@ -843,7 +889,7 @@ const MainPage: React.FC = () => {
               }
               title={
                 ((activeTab === 'encrypt' && encryptionStatus === 'error') ||
-                 (activeTab === 'decrypt' && decryptionStatus === 'error'))
+                  (activeTab === 'decrypt' && decryptionStatus === 'error'))
                   ? "오류가 발생했습니다"
                   : "복사"
               }
@@ -874,12 +920,12 @@ const MainPage: React.FC = () => {
           }}
           placeholder={
             fullScreenType === 'encrypt' ? '암호화할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
-            fullScreenType === 'decrypt' ? '복호화할 암호화된 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
-            ''
+              fullScreenType === 'decrypt' ? '복호화할 암호화된 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
+                ''
           }
         />
-        <div style={{ 
-          marginTop: '8px', 
+        <div style={{
+          marginTop: '8px',
           textAlign: 'right',
           fontSize: '12px',
           color: '#666'

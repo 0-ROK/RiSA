@@ -26,3 +26,26 @@ export interface RSAKeyPair {
   keySize: number;
   created: Date;
 }
+
+export interface HistoryItem {
+  id: string;
+  type: 'encrypt' | 'decrypt';
+  keyId: string;
+  keyName: string;
+  algorithm: 'RSA-OAEP' | 'RSA-PKCS1';
+  inputText: string;
+  outputText: string;
+  success: boolean;
+  errorMessage?: string;
+  timestamp: Date;
+  keySize: number;
+}
+
+export interface HistoryFilter {
+  type?: 'encrypt' | 'decrypt';
+  keyId?: string;
+  algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';
+  success?: boolean;
+  dateFrom?: Date;
+  dateTo?: Date;
+}

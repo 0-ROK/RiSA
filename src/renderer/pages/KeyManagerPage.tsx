@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Card, 
-  Button, 
-  Table, 
-  Space, 
-  Typography, 
+import {
+  Card,
+  Button,
+  Table,
+  Space,
+  Typography,
   message,
   Modal,
   Input,
@@ -15,9 +15,9 @@ import {
   Alert,
   notification
 } from 'antd';
-import { 
-  KeyOutlined, 
-  PlusOutlined, 
+import {
+  KeyOutlined,
+  PlusOutlined,
   CopyOutlined,
   DeleteOutlined,
   EyeOutlined,
@@ -56,7 +56,7 @@ const KeyManagerPage: React.FC = () => {
     setGenerateLoading(true);
     try {
       const keyPair = await window.electronAPI.generateRSAKeys(values.keySize);
-      
+
       const savedKey: SavedKey = {
         id: crypto.randomUUID(),
         name: values.name,
@@ -97,7 +97,7 @@ const KeyManagerPage: React.FC = () => {
 
   const handleUpdateKey = async (values: { name: string; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
     if (!editingKey) return;
-    
+
     try {
       const updatedKey: SavedKey = {
         ...editingKey,
@@ -107,7 +107,7 @@ const KeyManagerPage: React.FC = () => {
 
       await deleteKey(editingKey.id);
       await saveKey(updatedKey);
-      
+
       setEditModalVisible(false);
       editForm.resetFields();
       setEditingKey(null);
@@ -121,12 +121,12 @@ const KeyManagerPage: React.FC = () => {
   const handleCopyKey = async (keyData: string, keyType: 'public' | 'private', keyName?: string) => {
     try {
       await navigator.clipboard.writeText(keyData);
-      
+
       const size = keyData.length;
-      const sizeText = size > 1000 ? `${Math.round(size/1000)}KB` : `${size}자`;
+      const sizeText = size > 1000 ? `${Math.round(size / 1000)}KB` : `${size}자`;
       const keyTypeName = keyType === 'public' ? '공개키' : '개인키';
       const keyDisplayName = keyName ? ` (${keyName})` : '';
-      
+
       notification.success({
         message: `${keyTypeName} 복사됨`,
         description: `${sizeText}의 ${keyTypeName} 데이터${keyDisplayName}가 클립보드에 복사되었습니다.`,
@@ -134,7 +134,7 @@ const KeyManagerPage: React.FC = () => {
         placement: 'topRight',
         duration: 3,
       });
-      
+
     } catch (error) {
       notification.error({
         message: '복사 실패',
@@ -161,7 +161,7 @@ const KeyManagerPage: React.FC = () => {
       // Base64 디코딩하여 키 길이 추정
       const keyContent = publicKey.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
       const keyLength = keyContent.length;
-      
+
       // 일반적인 RSA 키 크기 추정
       if (keyLength < 400) return 1024;
       else if (keyLength < 800) return 2048;
@@ -194,10 +194,10 @@ const KeyManagerPage: React.FC = () => {
     const cleanContent = keyContent.replace(/\s/g, '');
     const header = keyType === 'public' ? '-----BEGIN PUBLIC KEY-----' : '-----BEGIN PRIVATE KEY-----';
     const footer = keyType === 'public' ? '-----END PUBLIC KEY-----' : '-----END PRIVATE KEY-----';
-    
+
     // 64자마다 줄바꿈 추가
     const formattedContent = cleanContent.match(/.{1,64}/g)?.join('\n') || cleanContent;
-    
+
     return `${header}\n${formattedContent}\n${footer}`;
   };
 
@@ -205,7 +205,7 @@ const KeyManagerPage: React.FC = () => {
   const validateAndNormalizeRSAKey = (key: string, keyType: 'public' | 'private'): { isValid: boolean; normalizedKey: string } => {
     try {
       const trimmedKey = key.trim();
-      
+
       // 이미 PEM 형식인지 확인
       const hasPEMFormat = (
         (trimmedKey.includes('-----BEGIN PUBLIC KEY-----') && trimmedKey.includes('-----END PUBLIC KEY-----')) ||
@@ -213,7 +213,7 @@ const KeyManagerPage: React.FC = () => {
         (trimmedKey.includes('-----BEGIN RSA PUBLIC KEY-----') && trimmedKey.includes('-----END RSA PUBLIC KEY-----')) ||
         (trimmedKey.includes('-----BEGIN RSA PRIVATE KEY-----') && trimmedKey.includes('-----END RSA PRIVATE KEY-----'))
       );
-      
+
       if (hasPEMFormat) {
         // 기존 PEM 형식 검증
         const keyContent = trimmedKey.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
@@ -227,7 +227,7 @@ const KeyManagerPage: React.FC = () => {
           return { isValid: true, normalizedKey };
         }
       }
-      
+
       return { isValid: false, normalizedKey: '' };
     } catch {
       return { isValid: false, normalizedKey: '' };
@@ -242,19 +242,19 @@ const KeyManagerPage: React.FC = () => {
         message.error('유효하지 않은 공개키 형식입니다. PEM 형식이거나 Base64 문자열을 입력해주세요.');
         return;
       }
-      
+
       const privateKeyResult = validateAndNormalizeRSAKey(values.privateKey, 'private');
       if (!privateKeyResult.isValid) {
         message.error('유효하지 않은 개인키 형식입니다. PEM 형식이거나 Base64 문자열을 입력해주세요.');
         return;
       }
-      
+
       // 이름 처리
       const keyName = values.name?.trim() || generateAutoName();
-      
+
       // 키 크기 감지
       const keySize = detectKeySize(publicKeyResult.normalizedKey);
-      
+
       const savedKey: SavedKey = {
         id: crypto.randomUUID(),
         name: keyName,
@@ -317,10 +317,10 @@ const KeyManagerPage: React.FC = () => {
       dataIndex: 'publicKey',
       key: 'publicKey',
       render: (publicKey: string) => (
-        <Text 
+        <Text
           ellipsis={{ tooltip: true }}
-          style={{ 
-            fontFamily: 'monospace', 
+          style={{
+            fontFamily: 'monospace',
             fontSize: '12px',
             maxWidth: '250px'
           }}
@@ -336,29 +336,29 @@ const KeyManagerPage: React.FC = () => {
       render: (_: any, record: SavedKey) => (
         <Space size="small">
           <Tooltip title="키 보기">
-            <Button 
-              icon={<EyeOutlined />} 
+            <Button
+              icon={<EyeOutlined />}
               size="small"
               onClick={() => handleViewKey(record)}
             />
           </Tooltip>
 
           <Tooltip title="키 편집">
-            <Button 
-              icon={<EditOutlined />} 
+            <Button
+              icon={<EditOutlined />}
               size="small"
               onClick={() => handleEditKey(record)}
             />
           </Tooltip>
-          
+
           <Tooltip title="공개키 복사">
-            <Button 
-              icon={<CopyOutlined />} 
+            <Button
+              icon={<CopyOutlined />}
               size="small"
               onClick={() => handleCopyKey(record.publicKey, 'public', record.name)}
             />
           </Tooltip>
-          
+
           <Tooltip title="키 삭제">
             <Popconfirm
               title={`"${record.name}" 키를 삭제하시겠습니까?`}
@@ -367,8 +367,8 @@ const KeyManagerPage: React.FC = () => {
               okText="삭제"
               cancelText="취소"
             >
-              <Button 
-                icon={<DeleteOutlined />} 
+              <Button
+                icon={<DeleteOutlined />}
                 size="small"
                 danger
               />
@@ -382,9 +382,9 @@ const KeyManagerPage: React.FC = () => {
   return (
     <div style={{ padding: '24px', minHeight: '100%' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 24
         }}>
@@ -392,18 +392,18 @@ const KeyManagerPage: React.FC = () => {
             <KeyOutlined style={{ marginRight: 8 }} />
             키 관리
           </Title>
-          
+
           <Space>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<PlusOutlined />}
               onClick={() => setGenerateModalVisible(true)}
               size="large"
             >
               새 키 생성
             </Button>
-            <Button 
-              type="default" 
+            <Button
+              type="default"
               icon={<ImportOutlined />}
               onClick={() => setImportModalVisible(true)}
               size="large"
@@ -456,7 +456,7 @@ const KeyManagerPage: React.FC = () => {
               ]}
               tooltip="키를 식별할 수 있는 이름을 입력하세요."
             >
-              <Input 
+              <Input
                 placeholder="예: MyPersonalKey, WorkKey, TestKey..."
                 autoFocus
               />
@@ -504,8 +504,8 @@ const KeyManagerPage: React.FC = () => {
               <Button onClick={() => setGenerateModalVisible(false)}>
                 취소
               </Button>
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 htmlType="submit"
                 loading={generateLoading}
               >
@@ -526,8 +526,8 @@ const KeyManagerPage: React.FC = () => {
           footer={null}
           width={800}
           style={{ top: 20 }}
-          bodyStyle={{ 
-            maxHeight: 'calc(100vh - 200px)', 
+          bodyStyle={{
+            maxHeight: 'calc(100vh - 200px)',
             overflowY: 'auto',
             padding: '24px'
           }}
@@ -546,7 +546,7 @@ const KeyManagerPage: React.FC = () => {
               ]}
               tooltip="이름을 입력하지 않으면 자동으로 생성됩니다."
             >
-              <Input 
+              <Input
                 placeholder="예: ImportedKey, ExternalKey... (빈 칸 시 자동 생성)"
               />
             </Form.Item>
@@ -579,7 +579,7 @@ const KeyManagerPage: React.FC = () => {
               name="publicKey"
               rules={[
                 { required: true, message: '공개키를 입력해주세요.' },
-                { 
+                {
                   validator: (_, value) => {
                     if (!value) return Promise.resolve();
                     const result = validateAndNormalizeRSAKey(value, 'public');
@@ -610,7 +610,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
               name="privateKey"
               rules={[
                 { required: true, message: '개인키를 입력해주세요.' },
-                { 
+                {
                   validator: (_, value) => {
                     if (!value) return Promise.resolve();
                     const result = validateAndNormalizeRSAKey(value, 'private');
@@ -636,15 +636,15 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
               />
             </Form.Item>
 
-            <div style={{ 
-              padding: '12px', 
-              backgroundColor: '#f0f8ff', 
+            <div style={{
+              padding: '12px',
+              backgroundColor: '#f0f8ff',
               borderRadius: '4px',
               marginBottom: '16px',
               border: '1px solid #d1ecf1'
             }}>
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                💡 <strong>팁:</strong> 
+                💡 <strong>팁:</strong>
                 <br />• 키 크기는 공개키에서 자동으로 감지됩니다
                 <br />• RSA PUBLIC KEY 및 RSA PRIVATE KEY 형식도 지원됩니다
                 <br />• 이름을 지정하지 않으면 "Imported_Key_[타임스탬프]" 형식으로 자동 생성됩니다
@@ -655,8 +655,8 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
               <Button onClick={() => setImportModalVisible(false)}>
                 취소
               </Button>
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 htmlType="submit"
               >
                 등록
@@ -676,8 +676,8 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
           }}
           width={800}
           style={{ top: 20 }}
-          bodyStyle={{ 
-            maxHeight: 'calc(100vh - 200px)', 
+          bodyStyle={{
+            maxHeight: 'calc(100vh - 200px)',
             overflowY: 'auto',
             padding: '24px'
           }}
@@ -692,7 +692,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text strong>공개키 (Public Key)</Text>
-                  <Button 
+                  <Button
                     size="small"
                     icon={<CopyOutlined />}
                     onClick={() => handleCopyKey(selectedKey.publicKey, 'public', selectedKey.name)}
@@ -712,7 +712,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text strong>개인키 (Private Key)</Text>
                   <Space>
-                    <Button 
+                    <Button
                       size="small"
                       icon={showPrivateKey ? <EyeInvisibleOutlined /> : <EyeOutlined />}
                       onClick={() => setShowPrivateKey(!showPrivateKey)}
@@ -720,7 +720,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
                       {showPrivateKey ? '숨기기' : '보기'}
                     </Button>
                     {showPrivateKey && (
-                      <Button 
+                      <Button
                         size="small"
                         icon={<CopyOutlined />}
                         onClick={() => handleCopyKey(selectedKey.privateKey, 'private', selectedKey.name)}
@@ -734,8 +734,8 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
                   value={showPrivateKey ? selectedKey.privateKey : '개인키를 보려면 "보기" 버튼을 클릭하세요.'}
                   readOnly
                   rows={12}
-                  style={{ 
-                    fontFamily: 'monospace', 
+                  style={{
+                    fontFamily: 'monospace',
                     fontSize: '12px',
                     backgroundColor: showPrivateKey ? '#fff' : '#f5f5f5'
                   }}
@@ -783,7 +783,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
               ]}
               tooltip="키를 식별할 수 있는 이름을 입력하세요."
             >
-              <Input 
+              <Input
                 placeholder="예: MyPersonalKey, WorkKey, TestKey..."
                 autoFocus
               />
@@ -813,9 +813,9 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
             )}
 
             {editingKey && (
-              <div style={{ 
-                padding: '12px', 
-                backgroundColor: '#f0f8ff', 
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#f0f8ff',
                 borderRadius: '4px',
                 marginBottom: '16px',
                 border: '1px solid #d1ecf1'
@@ -824,7 +824,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
                   <strong>현재 키 정보:</strong>
                   <br />• 키 크기: {editingKey.keySize} bits
                   <br />• 생성일: {new Date(editingKey.created).toLocaleDateString('ko-KR')}
-                  <br />• 키 내용은 보안상 수정할 수 없습니다
+                  <br />• 실제 키 데이터(공개키/개인키)는 수학적 무결성을 위해 수정할 수 없습니다
                 </Text>
               </div>
             )}
@@ -833,8 +833,8 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
               <Button onClick={() => setEditModalVisible(false)}>
                 취소
               </Button>
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 htmlType="submit"
               >
                 수정
