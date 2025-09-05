@@ -337,9 +337,15 @@ const ChainBuilderPage: React.FC = () => {
       setOutputText(result.finalOutput);
 
       if (result.success) {
-        message.success('체인 실행이 완료되었습니다.');
+        message.success(`체인 실행이 완료되었습니다. (${result.totalDuration}ms)`);
       } else {
-        message.error('체인 실행 중 오류가 발생했습니다.');
+        // 더 상세한 오류 정보 제공
+        const failedStep = result.steps.find(step => !step.success);
+        const errorMsg = failedStep 
+          ? `${failedStep.stepType} 스텝에서 오류: ${failedStep.error}`
+          : '체인 실행 중 오류가 발생했습니다.';
+        message.error(errorMsg);
+        console.error('Chain execution failed:', result.steps);
       }
 
       // 히스토리에 저장
@@ -649,16 +655,21 @@ const ChainBuilderPage: React.FC = () => {
             form.resetFields();
           }}
           onOk={() => form.submit()}
+          afterOpenChange={(open) => {
+            if (open && currentTemplate) {
+              // 모달이 열릴 때마다 현재 템플릿 정보로 폼을 설정
+              form.setFieldsValue({
+                name: currentTemplate.name,
+                description: currentTemplate.description,
+                tags: currentTemplate.tags,
+              });
+            }
+          }}
         >
           <Form
             form={form}
             onFinish={handleSaveTemplate}
             layout="vertical"
-            initialValues={{
-              name: currentTemplate?.name,
-              description: currentTemplate?.description,
-              tags: currentTemplate?.tags,
-            }}
           >
             <Form.Item
               name="name"

@@ -144,12 +144,10 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
     }
 
     for (const step of enabledSteps) {
-      const moduleInfo = CHAIN_MODULES[step.type];
-      
       // Check required parameters for RSA operations
       if (step.type === 'rsa-encrypt' || step.type === 'rsa-decrypt') {
         if (!step.params || !step.params.keyId) {
-          errors.push(`${step.name || step.type} 스텝에서 keyId 파라미터가 필요합니다.`);
+          errors.push(`${step.name || step.type} 스텝에서 키를 선택해주세요.`);
         }
       }
     }

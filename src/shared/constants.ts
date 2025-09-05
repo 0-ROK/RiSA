@@ -71,9 +71,9 @@ export const DEFAULT_CHAIN_TEMPLATES = [
     description: 'URL을 안전하게 전송하기 위해 인코딩 → RSA 암호화 → Base64 인코딩',
     tags: ['보안', 'URL', '전송'],
     steps: [
-      { id: '1', type: 'url-encode' as const, enabled: true },
-      { id: '2', type: 'rsa-encrypt' as const, enabled: true },
-      { id: '3', type: 'base64-encode' as const, enabled: true },
+      { id: '1', type: 'url-encode' as const, enabled: true, params: {} },
+      { id: '2', type: 'rsa-encrypt' as const, enabled: true, params: {} },
+      { id: '3', type: 'base64-encode' as const, enabled: true, params: {} },
     ],
   },
   {
@@ -82,9 +82,9 @@ export const DEFAULT_CHAIN_TEMPLATES = [
     description: '암호화된 URL을 복호화 Base64 디코딩 → RSA 복호화 → URL 디코딩',
     tags: ['보안', 'URL', '수신'],
     steps: [
-      { id: '1', type: 'base64-decode' as const, enabled: true },
-      { id: '2', type: 'rsa-decrypt' as const, enabled: true },
-      { id: '3', type: 'url-decode' as const, enabled: true },
+      { id: '1', type: 'base64-decode' as const, enabled: true, params: {} },
+      { id: '2', type: 'rsa-decrypt' as const, enabled: true, params: {} },
+      { id: '3', type: 'url-decode' as const, enabled: true, params: {} },
     ],
   },
   {
@@ -93,8 +93,8 @@ export const DEFAULT_CHAIN_TEMPLATES = [
     description: '텍스트를 URL 인코딩 후 Base64로 한 번 더 인코딩',
     tags: ['인코딩', '변환'],
     steps: [
-      { id: '1', type: 'url-encode' as const, enabled: true },
-      { id: '2', type: 'base64-encode' as const, enabled: true },
+      { id: '1', type: 'url-encode' as const, enabled: true, params: {} },
+      { id: '2', type: 'base64-encode' as const, enabled: true, params: {} },
     ],
   },
   {
@@ -103,8 +103,8 @@ export const DEFAULT_CHAIN_TEMPLATES = [
     description: 'RSA 암호화 후 Base64로 인코딩하여 전송 가능한 형태로 변환',
     tags: ['암호화', '보안'],
     steps: [
-      { id: '1', type: 'rsa-encrypt' as const, enabled: true },
-      { id: '2', type: 'base64-encode' as const, enabled: true },
+      { id: '1', type: 'rsa-encrypt' as const, enabled: true, params: {} },
+      { id: '2', type: 'base64-encode' as const, enabled: true, params: {} },
     ],
   },
 ] as const;
