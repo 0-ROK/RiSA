@@ -29,20 +29,20 @@ export interface RSAKeyPair {
 
 export interface HistoryItem {
   id: string;
-  type: 'encrypt' | 'decrypt';
-  keyId: string;
-  keyName: string;
-  algorithm: 'RSA-OAEP' | 'RSA-PKCS1';
+  type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode';
+  keyId?: string;  // Optional for URL operations
+  keyName?: string;  // Optional for URL operations
+  algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';  // Optional for URL operations
   inputText: string;
   outputText: string;
   success: boolean;
   errorMessage?: string;
   timestamp: Date;
-  keySize: number;
+  keySize?: number;  // Optional for URL operations
 }
 
 export interface HistoryFilter {
-  type?: 'encrypt' | 'decrypt';
+  type?: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode';
   keyId?: string;
   algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';
   success?: boolean;

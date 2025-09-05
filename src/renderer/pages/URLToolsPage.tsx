@@ -20,12 +20,14 @@ import {
   CheckOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons';
+import { useHistory } from '../store/HistoryContext';
+import { HistoryItem } from '../../shared/types';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
-const { TabPane } = Tabs;
 
 const URLToolsPage: React.FC = () => {
+  const { saveHistoryItem } = useHistory();
   const [encodeInput, setEncodeInput] = useState('');
   const [encodeOutput, setEncodeOutput] = useState('');
   const [decodeInput, setDecodeInput] = useState('');
@@ -35,7 +37,7 @@ const URLToolsPage: React.FC = () => {
   const [fullScreenContent, setFullScreenContent] = useState('');
   const [activeTab, setActiveTab] = useState('encode');
 
-  const handleEncode = () => {
+  const handleEncode = async () => {
     if (!encodeInput.trim()) {
       message.error('인코딩할 텍스트를 입력해주세요.');
       return;
@@ -45,6 +47,22 @@ const URLToolsPage: React.FC = () => {
       const encoded = encodeURIComponent(encodeInput);
       setEncodeOutput(encoded);
       message.success('URL 인코딩이 완료되었습니다.');
+
+      // 히스토리에 저장
+      const historyItem: HistoryItem = {
+        id: crypto.randomUUID(),
+        type: 'url-encode',
+        inputText: encodeInput,
+        outputText: encoded,
+        success: true,
+        timestamp: new Date(),
+      };
+
+      try {
+        await saveHistoryItem(historyItem);
+      } catch (error) {
+        console.error('Failed to save history:', error);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       notification.error({
@@ -55,10 +73,27 @@ const URLToolsPage: React.FC = () => {
         duration: 5,
       });
       console.error('Encoding error:', error);
+
+      // 실패 히스토리 저장
+      const failedHistoryItem: HistoryItem = {
+        id: crypto.randomUUID(),
+        type: 'url-encode',
+        inputText: encodeInput,
+        outputText: '',
+        success: false,
+        errorMessage: errorMessage,
+        timestamp: new Date(),
+      };
+
+      try {
+        await saveHistoryItem(failedHistoryItem);
+      } catch (historyError) {
+        console.error('Failed to save failed encoding history:', historyError);
+      }
     }
   };
 
-  const handleDecode = () => {
+  const handleDecode = async () => {
     if (!decodeInput.trim()) {
       message.error('디코딩할 텍스트를 입력해주세요.');
       return;
@@ -68,6 +103,22 @@ const URLToolsPage: React.FC = () => {
       const decoded = decodeURIComponent(decodeInput);
       setDecodeOutput(decoded);
       message.success('URL 디코딩이 완료되었습니다.');
+
+      // 히스토리에 저장
+      const historyItem: HistoryItem = {
+        id: crypto.randomUUID(),
+        type: 'url-decode',
+        inputText: decodeInput,
+        outputText: decoded,
+        success: true,
+        timestamp: new Date(),
+      };
+
+      try {
+        await saveHistoryItem(historyItem);
+      } catch (error) {
+        console.error('Failed to save history:', error);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       
@@ -94,6 +145,23 @@ const URLToolsPage: React.FC = () => {
         style: { width: 400 },
       });
       console.error('Decoding error:', error);
+
+      // 실패 히스토리 저장
+      const failedHistoryItem: HistoryItem = {
+        id: crypto.randomUUID(),
+        type: 'url-decode',
+        inputText: decodeInput,
+        outputText: '',
+        success: false,
+        errorMessage: errorMessage,
+        timestamp: new Date(),
+      };
+
+      try {
+        await saveHistoryItem(failedHistoryItem);
+      } catch (historyError) {
+        console.error('Failed to save failed decoding history:', historyError);
+      }
     }
   };
 
@@ -276,11 +344,13 @@ const URLToolsPage: React.FC = () => {
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{
+                          styles={{
+                            body: {
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
-                            padding: '16px'
+                              padding: '16px'
+                            }
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -322,11 +392,13 @@ const URLToolsPage: React.FC = () => {
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{
+                          styles={{
+                            body: {
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
-                            padding: '16px'
+                              padding: '16px'
+                            }
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -392,11 +464,13 @@ const URLToolsPage: React.FC = () => {
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{
+                          styles={{
+                            body: {
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
-                            padding: '16px'
+                              padding: '16px'
+                            }
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -439,11 +513,13 @@ const URLToolsPage: React.FC = () => {
                             display: 'flex',
                             flexDirection: 'column'
                           }}
-                          bodyStyle={{
+                          styles={{
+                            body: {
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
-                            padding: '16px'
+                              padding: '16px'
+                            }
                           }}
                         >
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -506,9 +582,11 @@ const URLToolsPage: React.FC = () => {
         onCancel={() => setFullScreenModalVisible(false)}
         width="90vw"
         style={{ top: 20 }}
-        bodyStyle={{
-          height: 'calc(100vh - 200px)',
-          padding: '24px'
+        styles={{
+          body: {
+            height: 'calc(100vh - 200px)',
+            padding: '24px'
+          }
         }}
         footer={
           (fullScreenType === 'encodeInput' || fullScreenType === 'decodeInput') ? [

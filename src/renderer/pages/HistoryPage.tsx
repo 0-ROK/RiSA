@@ -142,26 +142,44 @@ const HistoryPage: React.FC = () => {
             dataIndex: 'type',
             key: 'type',
             width: 80,
-            render: (type: 'encrypt' | 'decrypt') => (
-                <Tag color={type === 'encrypt' ? 'blue' : 'green'}>
-                    {type === 'encrypt' ? '암호화' : '복호화'}
-                </Tag>
-            ),
+            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode') => {
+                const tagInfo = {
+                    'encrypt': { color: 'blue', text: '암호화' },
+                    'decrypt': { color: 'green', text: '복호화' },
+                    'url-encode': { color: 'purple', text: 'URL 인코딩' },
+                    'url-decode': { color: 'orange', text: 'URL 디코딩' }
+                };
+                return (
+                    <Tag color={tagInfo[type].color}>
+                        {tagInfo[type].text}
+                    </Tag>
+                );
+            },
         },
         {
             title: '키',
             dataIndex: 'keyName',
             key: 'keyName',
             width: 150,
-            render: (keyName: string, record: HistoryItem) => (
-                <div>
-                    <Text strong style={{ fontSize: '13px' }}>{keyName}</Text>
-                    <br />
-                    <Text type="secondary" style={{ fontSize: '11px' }}>
-                        {record.keySize} bits, {record.algorithm}
-                    </Text>
-                </div>
-            ),
+            render: (keyName: string, record: HistoryItem) => {
+                // URL 작업의 경우 키 정보가 없음
+                if (record.type === 'url-encode' || record.type === 'url-decode') {
+                    return (
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            N/A
+                        </Text>
+                    );
+                }
+                return (
+                    <div>
+                        <Text strong style={{ fontSize: '13px' }}>{keyName}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                            {record.keySize} bits, {record.algorithm}
+                        </Text>
+                    </div>
+                );
+            },
         },
         {
             title: '상태',
@@ -285,7 +303,14 @@ const HistoryPage: React.FC = () => {
                         message="필터가 적용된 상태입니다"
                         description={
                             <div>
-                                {filter.type && <Tag>유형: {filter.type === 'encrypt' ? '암호화' : '복호화'}</Tag>}
+                                {filter.type && (
+                                    <Tag>유형: {
+                                        filter.type === 'encrypt' ? '암호화' :
+                                        filter.type === 'decrypt' ? '복호화' :
+                                        filter.type === 'url-encode' ? 'URL 인코딩' :
+                                        'URL 디코딩'
+                                    }</Tag>
+                                )}
                                 {filter.algorithm && <Tag>알고리즘: {filter.algorithm}</Tag>}
                                 {filter.success !== undefined && <Tag>상태: {filter.success ? '성공' : '실패'}</Tag>}
                                 {filter.keyId && <Tag>키: {getKeyName(filter.keyId)}</Tag>}
@@ -315,7 +340,7 @@ const HistoryPage: React.FC = () => {
                             showTotal: (total, range) => `${range[0]}-${range[1]} / 총 ${total}개`,
                         }}
                         locale={{
-                            emptyText: '히스토리가 없습니다. 암호화/복호화를 실행하면 히스토리가 기록됩니다.',
+                            emptyText: '히스토리가 없습니다. 암호화/복호화 또는 URL 인코딩/디코딩을 실행하면 히스토리가 기록됩니다.',
                         }}
                         scroll={{ x: 1000 }}
                     />
@@ -323,7 +348,12 @@ const HistoryPage: React.FC = () => {
 
                 {/* 상세 보기 모달 */}
                 <Modal
-                    title={`히스토리 상세 - ${selectedHistoryItem?.type === 'encrypt' ? '암호화' : '복호화'}`}
+                    title={`히스토리 상세 - ${
+                        selectedHistoryItem?.type === 'encrypt' ? '암호화' :
+                        selectedHistoryItem?.type === 'decrypt' ? '복호화' :
+                        selectedHistoryItem?.type === 'url-encode' ? 'URL 인코딩' :
+                        'URL 디코딩'
+                    }`}
                     open={viewModalVisible}
                     onCancel={() => {
                         setViewModalVisible(false);
@@ -352,9 +382,13 @@ const HistoryPage: React.FC = () => {
                             }}>
                                 <Space direction="vertical" size="small">
                                     <Text><strong>시간:</strong> {new Date(selectedHistoryItem.timestamp).toLocaleString('ko-KR')}</Text>
-                                    <Text><strong>키:</strong> {selectedHistoryItem.keyName}</Text>
-                                    <Text><strong>키 크기:</strong> {selectedHistoryItem.keySize} bits</Text>
-                                    <Text><strong>알고리즘:</strong> {selectedHistoryItem.algorithm}</Text>
+                                    {(selectedHistoryItem.type === 'encrypt' || selectedHistoryItem.type === 'decrypt') && (
+                                        <>
+                                            <Text><strong>키:</strong> {selectedHistoryItem.keyName}</Text>
+                                            <Text><strong>키 크기:</strong> {selectedHistoryItem.keySize} bits</Text>
+                                            <Text><strong>알고리즘:</strong> {selectedHistoryItem.algorithm}</Text>
+                                        </>
+                                    )}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <Text><strong>상태:</strong></Text>
                                         <Tag color={selectedHistoryItem.success ? 'success' : 'error'}>
@@ -445,6 +479,8 @@ const HistoryPage: React.FC = () => {
                             <Select placeholder="모든 유형" allowClear>
                                 <Select.Option value="encrypt">암호화</Select.Option>
                                 <Select.Option value="decrypt">복호화</Select.Option>
+                                <Select.Option value="url-encode">URL 인코딩</Select.Option>
+                                <Select.Option value="url-decode">URL 디코딩</Select.Option>
                             </Select>
                         </Form.Item>
 
