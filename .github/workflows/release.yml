@@ -196,8 +196,10 @@ jobs:
         with:
           name: macos-artifacts
           path: |
-            **/*.dmg
-            **/*.zip
+            release/*.dmg
+            release/*.zip
+            release/*.yml
+            release/*.blockmap
           retention-days: 5
 
   # Job 2: Release - 빌드된 파일들을 GitHub Releases에 배포
@@ -224,7 +226,7 @@ jobs:
       - name: List downloaded artifacts
         run: |
           echo "=== Downloaded artifacts ==="
-          find . -type f \( -name "*.dmg" -o -name "*.zip" \) -exec ls -la {} \;
+          find . -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.yml" -o -name "*.blockmap" \) -exec ls -la {} \;
           echo "=== All files in current directory ==="
           ls -la
 
@@ -251,10 +253,10 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            release/*.dmg
-            release/*.zip
-            release/*.yml
-            release/*.blockmap
+            *.dmg
+            *.zip
+            *.yml
+            *.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
