@@ -1,6 +1,6 @@
 {
   "name": "risa",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "main": "dist/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
