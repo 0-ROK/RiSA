@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import MainPage from './pages/MainPage';
 import KeyManagerPage from './pages/KeyManagerPage';
 import HistoryPage from './pages/HistoryPage';
+import URLToolsPage from './pages/URLToolsPage';
 import UpdateNotification from './components/UpdateNotification';
 
 const { Content } = Layout;
@@ -23,6 +24,7 @@ const App: React.FC = () => {
             <Route path="/" element={<MainPage />} />
             <Route path="/keys" element={<KeyManagerPage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/url-tools" element={<URLToolsPage />} />
           </Routes>
         </Content>
       </Layout>

@@ -4,7 +4,8 @@ import {
   LockOutlined,
   KeyOutlined,
   HomeOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -25,6 +26,11 @@ const Sidebar: React.FC = () => {
       key: '/keys',
       icon: <KeyOutlined />,
       label: '키 관리',
+    },
+    {
+      key: '/url-tools',
+      icon: <LinkOutlined />,
+      label: 'URL 인코딩/디코딩',
     },
     {
       key: '/history',
