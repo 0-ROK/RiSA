@@ -5,19 +5,27 @@ import NodeRSA from 'node-rsa';
 import * as forge from 'node-forge';
 import * as fs from 'fs';
 import { autoUpdater } from 'electron-updater';
-import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter } from '../shared/types';
-import { IPC_CHANNELS } from '../shared/constants';
+import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate } from '../shared/types';
+import { IPC_CHANNELS, CHAIN_MODULES, DEFAULT_CHAIN_TEMPLATES } from '../shared/constants';
+import { chainExecutor } from './chainExecutor';
 
 // Type-safe store interface
 interface StoreData {
   keys: SavedKey[];
   history: HistoryItem[];
+  chainTemplates: ChainTemplate[];
 }
 
 const store = new Store({
   defaults: {
     keys: [] as SavedKey[],
-    history: [] as HistoryItem[]
+    history: [] as HistoryItem[],
+    chainTemplates: DEFAULT_CHAIN_TEMPLATES.map(template => ({
+      ...template,
+      steps: template.steps.map(step => ({ ...step })), // Make steps mutable
+      tags: [...template.tags], // Make tags mutable
+      created: new Date(),
+    })) as ChainTemplate[]
   }
 });
 
@@ -534,4 +542,59 @@ ipcMain.handle(IPC_CHANNELS.CLEAR_HISTORY, async (): Promise<void> => {
     console.error('Failed to clear history:', error);
     throw error;
   }
+});
+
+// Chain management
+ipcMain.handle(IPC_CHANNELS.EXECUTE_CHAIN, async (_, steps: ChainStep[], inputText: string, templateId?: string, templateName?: string): Promise<ChainExecutionResult> => {
+  try {
+    const result = await chainExecutor.executeChain(steps, inputText, templateId, templateName);
+    console.log(`Chain execution completed - Success: ${result.success}, Duration: ${result.totalDuration}ms`);
+    return result;
+  } catch (error) {
+    console.error('Failed to execute chain:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.GET_CHAIN_TEMPLATES, (): ChainTemplate[] => {
+  return storeGet('chainTemplates', []);
+});
+
+ipcMain.handle(IPC_CHANNELS.SAVE_CHAIN_TEMPLATE, (_, template: ChainTemplate): void => {
+  const templates = storeGet('chainTemplates', []);
+  
+  // Check if template already exists and update it
+  const existingIndex = templates.findIndex(t => t.id === template.id);
+  if (existingIndex >= 0) {
+    templates[existingIndex] = template;
+  } else {
+    templates.push(template);
+  }
+  
+  storeSet('chainTemplates', templates);
+  console.log(`Chain template saved: ${template.name}`);
+});
+
+ipcMain.handle(IPC_CHANNELS.UPDATE_CHAIN_TEMPLATE, (_, template: ChainTemplate): void => {
+  const templates = storeGet('chainTemplates', []);
+  const index = templates.findIndex(t => t.id === template.id);
+  
+  if (index >= 0) {
+    templates[index] = { ...template, lastUsed: new Date() };
+    storeSet('chainTemplates', templates);
+    console.log(`Chain template updated: ${template.name}`);
+  } else {
+    throw new Error(`Template with ID ${template.id} not found`);
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.DELETE_CHAIN_TEMPLATE, (_, templateId: string): void => {
+  const templates = storeGet('chainTemplates', []);
+  const filteredTemplates = templates.filter(t => t.id !== templateId);
+  storeSet('chainTemplates', filteredTemplates);
+  console.log(`Chain template deleted: ${templateId}`);
+});
+
+ipcMain.handle(IPC_CHANNELS.GET_CHAIN_MODULES, () => {
+  return chainExecutor.getAvailableModules();
 });

@@ -6,6 +6,7 @@ import MainPage from './pages/MainPage';
 import KeyManagerPage from './pages/KeyManagerPage';
 import HistoryPage from './pages/HistoryPage';
 import URLToolsPage from './pages/URLToolsPage';
+import ChainBuilderPage from './pages/ChainBuilderPage';
 import UpdateNotification from './components/UpdateNotification';
 
 const { Content } = Layout;
@@ -23,8 +24,9 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<MainPage />} />
             <Route path="/keys" element={<KeyManagerPage />} />
-            <Route path="/history" element={<HistoryPage />} />
             <Route path="/url-tools" element={<URLToolsPage />} />
+            <Route path="/chain-builder" element={<ChainBuilderPage />} />
+            <Route path="/history" element={<HistoryPage />} />
           </Routes>
         </Content>
       </Layout>

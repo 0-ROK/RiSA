@@ -5,6 +5,7 @@ import { ConfigProvider } from 'antd';
 import App from './App';
 import { KeyProvider } from './store/KeyContext';
 import { HistoryProvider } from './store/HistoryContext';
+import { ChainProvider } from './store/ChainContext';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
@@ -14,15 +15,17 @@ root.render(
     <HashRouter>
       <KeyProvider>
         <HistoryProvider>
-          <ConfigProvider
-            theme={{
-              token: {
-                colorPrimary: '#1890ff',
-              },
-            }}
-          >
-            <App />
-          </ConfigProvider>
+          <ChainProvider>
+            <ConfigProvider
+              theme={{
+                token: {
+                  colorPrimary: '#1890ff',
+                },
+              }}
+            >
+              <App />
+            </ConfigProvider>
+          </ChainProvider>
         </HistoryProvider>
       </KeyProvider>
     </HashRouter>

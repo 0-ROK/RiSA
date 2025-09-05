@@ -27,25 +27,89 @@ export interface RSAKeyPair {
   created: Date;
 }
 
+// Chain-related types
+export type ChainStepType = 'url-encode' | 'url-decode' | 'rsa-encrypt' | 'rsa-decrypt' | 'base64-encode' | 'base64-decode';
+
+export interface ChainStep {
+  id: string;
+  type: ChainStepType;
+  params?: {
+    keyId?: string;
+    algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';
+    [key: string]: any;
+  };
+  enabled: boolean;
+  name?: string;
+  description?: string;
+}
+
+export interface ChainTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  steps: ChainStep[];
+  created: Date;
+  lastUsed?: Date;
+  tags?: string[];
+}
+
+export interface ChainStepResult {
+  stepId: string;
+  stepType: ChainStepType;
+  input: string;
+  output: string;
+  success: boolean;
+  error?: string;
+  duration: number;
+}
+
+export interface ChainExecutionResult {
+  id: string;
+  templateId?: string;
+  templateName?: string;
+  success: boolean;
+  steps: ChainStepResult[];
+  finalOutput: string;
+  totalDuration: number;
+  timestamp: Date;
+  inputText: string;
+}
+
+export interface ChainModule {
+  type: ChainStepType;
+  name: string;
+  description: string;
+  category: 'encoding' | 'crypto' | 'transform';
+  icon: string;
+  requiredParams?: string[];
+  optionalParams?: string[];
+}
+
 export interface HistoryItem {
   id: string;
-  type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode';
-  keyId?: string;  // Optional for URL operations
-  keyName?: string;  // Optional for URL operations
-  algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';  // Optional for URL operations
+  type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'chain';
+  keyId?: string;  // Optional for URL operations and chains
+  keyName?: string;  // Optional for URL operations and chains
+  algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';  // Optional for URL operations and chains
   inputText: string;
   outputText: string;
   success: boolean;
   errorMessage?: string;
   timestamp: Date;
-  keySize?: number;  // Optional for URL operations
+  keySize?: number;  // Optional for URL operations and chains
+  // Chain-specific fields
+  chainId?: string;
+  chainName?: string;
+  chainSteps?: number;
+  chainDuration?: number;
 }
 
 export interface HistoryFilter {
-  type?: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode';
+  type?: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'chain';
   keyId?: string;
   algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';
   success?: boolean;
   dateFrom?: Date;
   dateTo?: Date;
+  chainId?: string;
 }

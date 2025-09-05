@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter } from '../shared/types';
+import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate, ChainStepType } from '../shared/types';
 import { IPC_CHANNELS } from '../shared/constants';
 
 const electronAPI = {
@@ -72,6 +72,25 @@ const electronAPI = {
 
   clearHistory: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.CLEAR_HISTORY),
+
+  // Chain operations
+  executeChain: (steps: ChainStep[], inputText: string, templateId?: string, templateName?: string): Promise<ChainExecutionResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.EXECUTE_CHAIN, steps, inputText, templateId, templateName),
+
+  getChainTemplates: (): Promise<ChainTemplate[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CHAIN_TEMPLATES),
+
+  saveChainTemplate: (template: ChainTemplate): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SAVE_CHAIN_TEMPLATE, template),
+
+  updateChainTemplate: (template: ChainTemplate): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHAIN_TEMPLATE, template),
+
+  deleteChainTemplate: (templateId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_CHAIN_TEMPLATE, templateId),
+
+  getChainModules: (): Promise<Record<ChainStepType, { name: string; description: string; category: string; requiredParams?: string[] }>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CHAIN_MODULES),
 
   // 이벤트 리스너 제거
   removeUpdateListeners: () => {

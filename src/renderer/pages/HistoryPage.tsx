@@ -142,12 +142,13 @@ const HistoryPage: React.FC = () => {
             dataIndex: 'type',
             key: 'type',
             width: 80,
-            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode') => {
+            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'chain') => {
                 const tagInfo = {
                     'encrypt': { color: 'blue', text: '암호화' },
                     'decrypt': { color: 'green', text: '복호화' },
                     'url-encode': { color: 'purple', text: 'URL 인코딩' },
-                    'url-decode': { color: 'orange', text: 'URL 디코딩' }
+                    'url-decode': { color: 'orange', text: 'URL 디코딩' },
+                    'chain': { color: 'gold', text: '체인 실행' }
                 };
                 return (
                     <Tag color={tagInfo[type].color}>
@@ -162,8 +163,21 @@ const HistoryPage: React.FC = () => {
             key: 'keyName',
             width: 150,
             render: (keyName: string, record: HistoryItem) => {
-                // URL 작업의 경우 키 정보가 없음
-                if (record.type === 'url-encode' || record.type === 'url-decode') {
+                // URL 작업이나 체인 작업의 경우
+                if (record.type === 'url-encode' || record.type === 'url-decode' || record.type === 'chain') {
+                    if (record.type === 'chain') {
+                        return (
+                            <div>
+                                <Text strong style={{ fontSize: '13px' }}>
+                                    {record.chainName || 'Unknown Chain'}
+                                </Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '11px' }}>
+                                    {record.chainSteps || 0}개 스텝, {record.chainDuration || 0}ms
+                                </Text>
+                            </div>
+                        );
+                    }
                     return (
                         <Text type="secondary" style={{ fontSize: '12px' }}>
                             N/A
@@ -308,7 +322,8 @@ const HistoryPage: React.FC = () => {
                                         filter.type === 'encrypt' ? '암호화' :
                                         filter.type === 'decrypt' ? '복호화' :
                                         filter.type === 'url-encode' ? 'URL 인코딩' :
-                                        'URL 디코딩'
+                                        filter.type === 'url-decode' ? 'URL 디코딩' :
+                                        '체인 실행'
                                     }</Tag>
                                 )}
                                 {filter.algorithm && <Tag>알고리즘: {filter.algorithm}</Tag>}
@@ -352,7 +367,8 @@ const HistoryPage: React.FC = () => {
                         selectedHistoryItem?.type === 'encrypt' ? '암호화' :
                         selectedHistoryItem?.type === 'decrypt' ? '복호화' :
                         selectedHistoryItem?.type === 'url-encode' ? 'URL 인코딩' :
-                        'URL 디코딩'
+                        selectedHistoryItem?.type === 'url-decode' ? 'URL 디코딩' :
+                        '체인 실행'
                     }`}
                     open={viewModalVisible}
                     onCancel={() => {
@@ -382,7 +398,13 @@ const HistoryPage: React.FC = () => {
                             }}>
                                 <Space direction="vertical" size="small">
                                     <Text><strong>시간:</strong> {new Date(selectedHistoryItem.timestamp).toLocaleString('ko-KR')}</Text>
-                                    {(selectedHistoryItem.type === 'encrypt' || selectedHistoryItem.type === 'decrypt') && (
+                                    {selectedHistoryItem.type === 'chain' ? (
+                                        <>
+                                            <Text><strong>체인명:</strong> {selectedHistoryItem.chainName || 'Unknown'}</Text>
+                                            <Text><strong>스텝 수:</strong> {selectedHistoryItem.chainSteps || 0}개</Text>
+                                            <Text><strong>실행 시간:</strong> {selectedHistoryItem.chainDuration || 0}ms</Text>
+                                        </>
+                                    ) : (selectedHistoryItem.type === 'encrypt' || selectedHistoryItem.type === 'decrypt') && (
                                         <>
                                             <Text><strong>키:</strong> {selectedHistoryItem.keyName}</Text>
                                             <Text><strong>키 크기:</strong> {selectedHistoryItem.keySize} bits</Text>
@@ -481,6 +503,7 @@ const HistoryPage: React.FC = () => {
                                 <Select.Option value="decrypt">복호화</Select.Option>
                                 <Select.Option value="url-encode">URL 인코딩</Select.Option>
                                 <Select.Option value="url-decode">URL 디코딩</Select.Option>
+                                <Select.Option value="chain">체인 실행</Select.Option>
                             </Select>
                         </Form.Item>
 
