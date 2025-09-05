@@ -143,11 +143,20 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
                 {getStepIcon(step.type)}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
                   {index + 1}. {moduleInfo?.name || step.type}
+                  {/* RSA 스텝에서 키가 선택되지 않은 경우 경고 표시 */}
+                  {needsKeySelection && (!step.params || !step.params.keyId) && (
+                    <Tooltip title="키를 선택해주세요">
+                      <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
+                    </Tooltip>
+                  )}
                 </div>
                 <div style={{ fontSize: '12px', color: '#666' }}>
                   {moduleInfo?.description || ''}
+                  {needsKeySelection && step.params?.keyId && (
+                    <span style={{ color: '#52c41a', marginLeft: 8 }}>✓ 키 선택됨</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -290,18 +299,6 @@ const ChainBuilderPage: React.FC = () => {
     });
   };
 
-  const handleMoveStep = (fromIndex: number, toIndex: number) => {
-    if (!currentTemplate) return;
-
-    const steps = Array.from(currentTemplate.steps);
-    const [movedStep] = steps.splice(fromIndex, 1);
-    steps.splice(toIndex, 0, movedStep);
-
-    setCurrentTemplate({
-      ...currentTemplate,
-      steps,
-    });
-  };
 
   const handleExecuteChain = async () => {
     if (!currentTemplate || !inputText.trim()) {
@@ -312,14 +309,19 @@ const ChainBuilderPage: React.FC = () => {
     const validation = validateChainSteps(currentTemplate.steps);
     if (!validation.valid) {
       notification.error({
-        message: '체인 검증 실패',
+        message: '체인 실행 불가',
         description: (
-          <ul>
-            {validation.errors.map((error, index) => (
-              <li key={index}>{error}</li>
-            ))}
-          </ul>
+          <div>
+            <p style={{ marginBottom: 8 }}>다음 문제들을 해결해주세요:</p>
+            <ul style={{ paddingLeft: 20, margin: 0 }}>
+              {validation.errors.map((error, index) => (
+                <li key={index} style={{ marginBottom: 4 }}>{error}</li>
+              ))}
+            </ul>
+          </div>
         ),
+        duration: 8,
+        style: { width: 400 },
       });
       return;
     }
@@ -510,15 +512,47 @@ const ChainBuilderPage: React.FC = () => {
             <Card
               title="실행 및 결과"
               extra={
-                <Button
-                  type="primary"
-                  icon={<PlayCircleOutlined />}
-                  loading={isExecuting}
-                  onClick={handleExecuteChain}
-                  disabled={!currentTemplate || currentTemplate.steps.length === 0}
-                >
-                  실행
-                </Button>
+                (() => {
+                  const canExecute = currentTemplate && currentTemplate.steps.length > 0 && inputText.trim();
+                  const validation = currentTemplate ? validateChainSteps(currentTemplate.steps) : { valid: false, errors: [] };
+                  const hasValidationErrors = !validation.valid;
+                  
+                  return (
+                    <Space>
+                      {hasValidationErrors && (
+                        <Tooltip 
+                          title={
+                            <div>
+                              <div style={{ marginBottom: 4 }}>실행 불가 사유:</div>
+                              <ul style={{ paddingLeft: 16, margin: 0 }}>
+                                {validation.errors.map((error, index) => (
+                                  <li key={index}>{error}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          }
+                        >
+                          <Button
+                            size="small"
+                            danger
+                            icon={<span>⚠️</span>}
+                          >
+                            문제 있음
+                          </Button>
+                        </Tooltip>
+                      )}
+                      <Button
+                        type="primary"
+                        icon={<PlayCircleOutlined />}
+                        loading={isExecuting}
+                        onClick={handleExecuteChain}
+                        disabled={!canExecute || hasValidationErrors}
+                      >
+                        실행
+                      </Button>
+                    </Space>
+                  );
+                })()
               }
             >
               <div style={{ marginBottom: 16 }}>

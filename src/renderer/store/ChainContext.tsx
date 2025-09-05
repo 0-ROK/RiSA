@@ -141,16 +141,20 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
 
     if (enabledSteps.length === 0) {
       errors.push('적어도 하나의 스텝이 활성화되어야 합니다.');
+      return { valid: false, errors };
     }
 
-    for (const step of enabledSteps) {
+    enabledSteps.forEach((step, index) => {
+      const stepPosition = index + 1;
+      const stepName = step.name || CHAIN_MODULES[step.type]?.name || step.type;
+      
       // Check required parameters for RSA operations
       if (step.type === 'rsa-encrypt' || step.type === 'rsa-decrypt') {
         if (!step.params || !step.params.keyId) {
-          errors.push(`${step.name || step.type} 스텝에서 키를 선택해주세요.`);
+          errors.push(`${stepPosition}번째 스텝 (${stepName})에서 RSA 키를 선택해주세요.`);
         }
       }
-    }
+    });
 
     return { valid: errors.length === 0, errors };
   };
