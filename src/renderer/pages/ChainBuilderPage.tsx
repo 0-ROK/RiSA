@@ -470,38 +470,21 @@ const ChainBuilderPage: React.FC = () => {
 
   return (
     <div style={{
-      height: '100vh',
+      minHeight: '100vh',
       display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0
+      flexDirection: 'column'
     }}>
       <PageHeader 
         title="체인 빌더"
         subtitle="다양한 암호화/변환 작업을 순차적으로 연결하여 커스텀 체인을 만들고 실행하세요."
         icon={<BulbOutlined style={{ color: '#faad14' }} />}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid #f0f0f0'
-        }}
       />
       <div style={{
-        paddingTop: '100px',
-        padding: '0 24px 24px 24px',
+        padding: '24px',
         maxWidth: 1400,
         margin: '0 auto',
         width: '100%',
-        height: '100%',
-        overflow: 'auto'
+        flex: 1
       }}>
 
         <Row gutter={[24, 24]}>

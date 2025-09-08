@@ -24,6 +24,11 @@ const PageHeader: React.FC<PageHeaderProps> = ({
     <div
       style={{
         WebkitAppRegion: 'drag',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #f0f0f0',
         padding: '0 24px',
         paddingTop: '24px',
         paddingBottom: '16px',

@@ -382,15 +382,9 @@ const KeyManagerPage: React.FC = () => {
 
   return (
     <div style={{
-      height: '100vh',
+      minHeight: '100vh',
       display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0
+      flexDirection: 'column'
     }}>
       <PageHeader 
         title="키 관리"
@@ -415,26 +409,13 @@ const KeyManagerPage: React.FC = () => {
             </Button>
           </Space>
         }
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid #f0f0f0'
-        }}
       />
       <div style={{
-        paddingTop: '100px',
-        padding: '0 24px 24px 24px',
+        padding: '24px',
         maxWidth: 1200,
         margin: '0 auto',
         width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        overflow: 'auto'
+        flex: 1
       }}>
 
         <Card>
