@@ -34,11 +34,26 @@ import {
   CheckOutlined,
   DragOutlined
 } from '@ant-design/icons';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { useChain } from '../store/ChainContext';
 import { useKeys } from '../store/KeyContext';
 import { useHistory } from '../store/HistoryContext';
 import { ChainStep, ChainTemplate, ChainStepType, HistoryItem } from '../../shared/types';
 import { CHAIN_MODULES } from '../../shared/constants';
+import { SortableStepItem } from '../components/SortableStepItem';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -225,6 +240,14 @@ const ChainBuilderPage: React.FC = () => {
   const [executionResult, setExecutionResult] = useState<any>(null);
   const [form] = Form.useForm();
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     if (!currentTemplate && templates.length > 0) {
       setCurrentTemplate(templates[0]);
@@ -289,14 +312,53 @@ const ChainBuilderPage: React.FC = () => {
     });
   };
 
-  const handleDeleteStep = (index: number) => {
+  const handleDeleteStep = (stepId: string) => {
     if (!currentTemplate) return;
 
-    const updatedSteps = currentTemplate.steps.filter((_, i) => i !== index);
+    const updatedSteps = currentTemplate.steps.filter(step => step.id !== stepId);
     setCurrentTemplate({
       ...currentTemplate,
       steps: updatedSteps,
     });
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (!currentTemplate || !active || !over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = currentTemplate.steps.findIndex(step => step.id === active.id);
+    const newIndex = currentTemplate.steps.findIndex(step => step.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newSteps = arrayMove(currentTemplate.steps, oldIndex, newIndex);
+      setCurrentTemplate({
+        ...currentTemplate,
+        steps: newSteps,
+      });
+    }
+  };
+
+  const handleToggleStep = (stepId: string) => {
+    if (!currentTemplate) return;
+    
+    const stepIndex = currentTemplate.steps.findIndex(s => s.id === stepId);
+    if (stepIndex === -1) return;
+    
+    const step = currentTemplate.steps[stepIndex];
+    handleUpdateStep(stepIndex, { ...step, enabled: !step.enabled });
+  };
+
+  const handleUpdateStepParams = (stepId: string, updates: Partial<ChainStep>) => {
+    if (!currentTemplate) return;
+    
+    const stepIndex = currentTemplate.steps.findIndex(s => s.id === stepId);
+    if (stepIndex === -1) return;
+    
+    const step = currentTemplate.steps[stepIndex];
+    handleUpdateStep(stepIndex, { ...step, ...updates });
   };
 
 
@@ -486,18 +548,30 @@ const ChainBuilderPage: React.FC = () => {
 
               {/* 체인 스텝들 */}
               {currentTemplate && currentTemplate.steps.length > 0 ? (
-                <div>
-                  {currentTemplate.steps.map((step, index) => (
-                    <StepCard
-                      key={step.id}
-                      step={step}
-                      index={index}
-                      onUpdate={(updatedStep) => handleUpdateStep(index, updatedStep)}
-                      onDelete={() => handleDeleteStep(index)}
-                      availableKeys={availableKeys}
-                    />
-                  ))}
-                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={currentTemplate.steps.map(step => step.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div>
+                      {currentTemplate.steps.map((step, index) => (
+                        <SortableStepItem
+                          key={step.id}
+                          step={step}
+                          index={index}
+                          savedKeys={keys}
+                          onToggle={handleToggleStep}
+                          onDelete={handleDeleteStep}
+                          onUpdateStep={handleUpdateStepParams}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               ) : (
                 <Empty
                   description="체인에 스텝을 추가해주세요"
