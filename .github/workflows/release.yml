@@ -241,12 +241,43 @@ jobs:
           done | jq -s . >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      # 릴리즈 노트 파일 확인
+      - name: Check for release notes
+        id: check_release_notes
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          RELEASE_NOTES_FILE="release-notes/${TAG_NAME}.md"
+          
+          if [ -f "$RELEASE_NOTES_FILE" ]; then
+            echo "release_notes_exists=true" >> $GITHUB_OUTPUT
+            echo "release_notes_file=$RELEASE_NOTES_FILE" >> $GITHUB_OUTPUT
+            echo "Found release notes file: $RELEASE_NOTES_FILE"
+          else
+            echo "release_notes_exists=false" >> $GITHUB_OUTPUT
+            echo "No release notes file found for $TAG_NAME, will use auto-generated notes"
+          fi
+
       # === 2단계 빌드/배포 아키텍처 - 2단계: 배포만 ===
       # 1단계에서 생성된 파일들을 GitHub Releases에 배포
       # electron-builder 대신 GitHub Actions 전용 액션 사용
       # 장점: 더 안정적, 유연한 배포 옵션, 자동 릴리즈 노트 생성
-      - name: Create Release
-        id: create_release
+      - name: Create Release (with custom release notes)
+        if: steps.check_release_notes.outputs.release_notes_exists == 'true'
+        id: create_release_custom
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          body_path: ${{ steps.check_release_notes.outputs.release_notes_file }}
+          files: |
+            *.dmg
+            *.zip
+            *.yml
+            *.blockmap
+
+      - name: Create Release (with auto-generated notes)
+        if: steps.check_release_notes.outputs.release_notes_exists == 'false'
+        id: create_release_auto
         uses: softprops/action-gh-release@v1
         with:
           draft: false

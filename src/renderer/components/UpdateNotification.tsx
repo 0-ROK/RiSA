@@ -82,6 +82,44 @@ const UpdateNotification: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const formatReleaseNotes = (releaseNotes: string): React.ReactNode => {
+    try {
+      // HTML 태그가 있는지 확인
+      const hasHtmlTags = /<[^>]*>/g.test(releaseNotes);
+      
+      if (hasHtmlTags) {
+        // HTML 태그 제거하고 마크다운 스타일로 변환
+        let formatted = releaseNotes
+          .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '## $1\n')
+          .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+          .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+          .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+          .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+          .replace(/<ul[^>]*>/gi, '')
+          .replace(/<\/ul>/gi, '')
+          .replace(/<li[^>]*>/gi, '• ')
+          .replace(/<\/li>/gi, '\n')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<p[^>]*>/gi, '')
+          .replace(/<\/p>/gi, '\n\n')
+          .replace(/<[^>]*>/g, '') // 남은 모든 HTML 태그 제거
+          .replace(/&nbsp;/gi, ' ')
+          .replace(/&lt;/gi, '<')
+          .replace(/&gt;/gi, '>')
+          .replace(/&amp;/gi, '&')
+          .trim();
+        
+        return <Text style={{ fontSize: 13, fontFamily: 'inherit' }}>{formatted}</Text>;
+      }
+      
+      // 일반 텍스트인 경우 그대로 표시
+      return <Text style={{ fontSize: 13, fontFamily: 'inherit' }}>{releaseNotes}</Text>;
+    } catch (error) {
+      console.error('릴리즈 노트 포맷팅 오류:', error);
+      return <Text style={{ fontSize: 13, fontFamily: 'inherit' }}>{releaseNotes}</Text>;
+    }
+  };
+
   return (
     <>
       {/* 업데이트 사용 가능 알림 */}
@@ -119,8 +157,20 @@ const UpdateNotification: React.FC = () => {
           {updateAvailable?.releaseNotes && (
             <div>
               <Text strong>릴리즈 노트:</Text>
-              <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto' }}>
-                <Text>{updateAvailable.releaseNotes}</Text>
+              <div 
+                style={{ 
+                  marginTop: 8, 
+                  maxHeight: 200, 
+                  overflow: 'auto',
+                  padding: 12,
+                  backgroundColor: '#fafafa',
+                  border: '1px solid #f0f0f0',
+                  borderRadius: 6,
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.5
+                }}
+              >
+                {formatReleaseNotes(updateAvailable.releaseNotes)}
               </div>
             </div>
           )}

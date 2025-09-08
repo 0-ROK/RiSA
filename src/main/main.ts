@@ -5,6 +5,7 @@ import NodeRSA from 'node-rsa';
 import * as forge from 'node-forge';
 import * as fs from 'fs';
 import { autoUpdater } from 'electron-updater';
+import type { UpdateInfo } from 'electron-updater/out/types';
 import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate } from '../shared/types';
 import { IPC_CHANNELS, CHAIN_MODULES, DEFAULT_CHAIN_TEMPLATES } from '../shared/constants';
 import { chainExecutor } from './chainExecutor';
@@ -67,6 +68,30 @@ const createWindow = (): void => {
   });
 };
 
+// === Auto Updater Helper Functions ===
+// electron-updater의 info 객체에서 릴리즈 노트를 추출하는 함수
+const extractReleaseNotes = (info: UpdateInfo): string | undefined => {
+  try {
+    // UpdateInfo의 releaseNotes 필드를 확인 (string | Array<ReleaseNoteInfo> | null)
+    if (typeof info.releaseNotes === 'string') {
+      // 문자열 형태 (일반적)
+      return info.releaseNotes.trim();
+    } else if (Array.isArray(info.releaseNotes)) {
+      // 배열 형태 (여러 버전의 릴리즈 노트)
+      const latestNote = info.releaseNotes[0];
+      if (latestNote && latestNote.note) {
+        return latestNote.note.trim();
+      }
+    }
+    
+    console.log('릴리즈 노트를 찾을 수 없음, info 객체 구조:', Object.keys(info));
+    return undefined;
+  } catch (error) {
+    console.error('릴리즈 노트 추출 중 오류:', error);
+    return undefined;
+  }
+};
+
 // === Auto Updater 설정 ===
 // GitHub Releases에서 업데이트 확인 및 다운로드
 // 연동: GitHub Actions → GitHub Releases → electron-updater → 사용자 앱
@@ -96,8 +121,18 @@ const setupAutoUpdater = (): void => {
 
   autoUpdater.on('update-available', (info) => {
     console.log('업데이트 사용 가능:', info);
+    
+    // electron-updater의 info 객체를 UI에서 사용할 수 있는 형태로 변환
+    const updateInfo = {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: extractReleaseNotes(info)
+    };
+    
+    console.log('변환된 업데이트 정보:', updateInfo);
+    
     if (mainWindow) {
-      mainWindow.webContents.send('update-available', info);
+      mainWindow.webContents.send('update-available', updateInfo);
     }
     // 수동으로 다운로드 시작 (사용자가 "자동 다운로드" 버튼을 클릭했을 때 시작됨)
   });
