@@ -22,9 +22,10 @@ import {
 } from '@ant-design/icons';
 import { useHistory } from '../store/HistoryContext';
 import { HistoryItem } from '../../shared/types';
+import PageHeader from '../components/PageHeader';
 
 const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const URLToolsPage: React.FC = () => {
   const { saveHistoryItem } = useHistory();
@@ -121,7 +122,7 @@ const URLToolsPage: React.FC = () => {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-      
+
       let helpText = '';
       if (errorMessage.includes('URI')) {
         helpText = '올바른 URL 인코딩 형식이 아닙니다. % 기호 뒤에는 정확히 2개의 16진수 문자가 와야 합니다.';
@@ -287,22 +288,41 @@ const URLToolsPage: React.FC = () => {
 
   return (
     <div style={{
-      padding: '24px',
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0
     }}>
+      <PageHeader 
+        title="URL 인코딩/디코딩"
+        icon={<LinkOutlined />}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #f0f0f0'
+        }}
+      />
       <div style={{
+        paddingTop: '100px',
+        padding: '0 24px 24px 24px',
         maxWidth: 1200,
         margin: '0 auto',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%'
+        height: '100%',
+        overflow: 'hidden'
       }}>
-        <Title level={2} style={{ marginBottom: '16px', flexShrink: 0 }}>URL 인코딩/디코딩</Title>
-        
+
         <Card style={{ marginBottom: 16, flexShrink: 0 }}>
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text strong>
@@ -346,9 +366,9 @@ const URLToolsPage: React.FC = () => {
                           }}
                           styles={{
                             body: {
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
+                              flex: 1,
+                              display: 'flex',
+                              flexDirection: 'column',
                               padding: '16px'
                             }
                           }}
@@ -394,9 +414,9 @@ const URLToolsPage: React.FC = () => {
                           }}
                           styles={{
                             body: {
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
+                              flex: 1,
+                              display: 'flex',
+                              flexDirection: 'column',
                               padding: '16px'
                             }
                           }}
@@ -466,9 +486,9 @@ const URLToolsPage: React.FC = () => {
                           }}
                           styles={{
                             body: {
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
+                              flex: 1,
+                              display: 'flex',
+                              flexDirection: 'column',
                               padding: '16px'
                             }
                           }}
@@ -515,9 +535,9 @@ const URLToolsPage: React.FC = () => {
                           }}
                           styles={{
                             body: {
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
+                              flex: 1,
+                              display: 'flex',
+                              flexDirection: 'column',
                               padding: '16px'
                             }
                           }}
@@ -574,9 +594,9 @@ const URLToolsPage: React.FC = () => {
       <Modal
         title={
           fullScreenType === 'encodeInput' ? 'URL 인코딩할 텍스트 편집' :
-          fullScreenType === 'encodeOutput' ? 'URL 인코딩 결과 보기' :
-          fullScreenType === 'decodeInput' ? 'URL 디코딩할 텍스트 편집' :
-          'URL 디코딩 결과 보기'
+            fullScreenType === 'encodeOutput' ? 'URL 인코딩 결과 보기' :
+              fullScreenType === 'decodeInput' ? 'URL 디코딩할 텍스트 편집' :
+                'URL 디코딩 결과 보기'
         }
         open={fullScreenModalVisible}
         onCancel={() => setFullScreenModalVisible(false)}
@@ -631,8 +651,8 @@ const URLToolsPage: React.FC = () => {
           }}
           placeholder={
             fullScreenType === 'encodeInput' ? 'URL 인코딩할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
-            fullScreenType === 'decodeInput' ? 'URL 디코딩할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
-            ''
+              fullScreenType === 'decodeInput' ? 'URL 디코딩할 텍스트를 입력하세요... (Cmd/Ctrl+Enter로 저장)' :
+                ''
           }
         />
         <div style={{

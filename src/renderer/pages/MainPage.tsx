@@ -31,9 +31,10 @@ import { useHistory } from '../store/HistoryContext';
 import { DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
 import { HistoryItem } from '../../shared/types';
 import AlgorithmSelector from '../components/AlgorithmSelector';
+import PageHeader from '../components/PageHeader';
 
 const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { TabPane } = Tabs;
 
 const MainPage: React.FC = () => {
@@ -517,21 +518,40 @@ const MainPage: React.FC = () => {
 
   return (
     <div style={{
-      padding: '24px',
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0
     }}>
+      <PageHeader 
+        title="RSA 암호화/복호화"
+        icon={<LockOutlined />}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #f0f0f0'
+        }}
+      />
       <div style={{
+        paddingTop: '100px',
+        padding: '0 24px 24px 24px',
         maxWidth: 1200,
         margin: '0 auto',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%'
+        height: '100%',
+        overflow: 'hidden'
       }}>
-        <Title level={2} style={{ marginBottom: '16px', flexShrink: 0 }}>RSA 암호화/복호화</Title>
 
         {/* 키 선택 및 알고리즘 선택 섹션 */}
         <Card style={{ marginBottom: 16, flexShrink: 0 }}>

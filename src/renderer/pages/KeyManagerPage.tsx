@@ -31,8 +31,9 @@ import { useKeys } from '../store/KeyContext';
 import { SavedKey } from '../../shared/types';
 import { RSA_KEY_SIZES } from '../../shared/constants';
 import AlgorithmSelector from '../components/AlgorithmSelector';
+import PageHeader from '../components/PageHeader';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { TextArea } = Input;
 
 const KeyManagerPage: React.FC = () => {
@@ -380,19 +381,21 @@ const KeyManagerPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '24px', minHeight: '100%' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 24
-        }}>
-          <Title level={2}>
-            <KeyOutlined style={{ marginRight: 8 }} />
-            키 관리
-          </Title>
-
+    <div style={{
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0
+    }}>
+      <PageHeader 
+        title="키 관리"
+        icon={<KeyOutlined />}
+        extra={
           <Space>
             <Button
               type="primary"
@@ -411,7 +414,28 @@ const KeyManagerPage: React.FC = () => {
               키 직접 등록
             </Button>
           </Space>
-        </div>
+        }
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #f0f0f0'
+        }}
+      />
+      <div style={{
+        paddingTop: '100px',
+        padding: '0 24px 24px 24px',
+        maxWidth: 1200,
+        margin: '0 auto',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'auto'
+      }}>
 
         <Card>
           <Table

@@ -32,8 +32,9 @@ import { useHistory } from '../store/HistoryContext';
 import { useKeys } from '../store/KeyContext';
 import { HistoryItem, HistoryFilter } from '../../shared/types';
 import dayjs from 'dayjs';
+import PageHeader from '../components/PageHeader';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
@@ -267,19 +268,21 @@ const HistoryPage: React.FC = () => {
     ];
 
     return (
-        <div style={{ padding: '24px', minHeight: '100%' }}>
-            <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 24
-                }}>
-                    <Title level={2}>
-                        <HistoryOutlined style={{ marginRight: 8 }} />
-                        암호화/복호화 히스토리
-                    </Title>
-
+        <div style={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0
+        }}>
+            <PageHeader 
+                title="암호화/복호화 히스토리"
+                icon={<HistoryOutlined />}
+                extra={
                     <Space>
                         <Button
                             icon={<FilterOutlined />}
@@ -310,7 +313,28 @@ const HistoryPage: React.FC = () => {
                             </Button>
                         </Popconfirm>
                     </Space>
-                </div>
+                }
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                    backgroundColor: '#ffffff',
+                    borderBottom: '1px solid #f0f0f0'
+                }}
+            />
+            <div style={{
+                paddingTop: '100px',
+                padding: '0 24px 24px 24px',
+                maxWidth: 1400,
+                margin: '0 auto',
+                width: '100%',
+                height: '100%',
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
 
                 {filter && (
                     <Alert
@@ -320,10 +344,10 @@ const HistoryPage: React.FC = () => {
                                 {filter.type && (
                                     <Tag>유형: {
                                         filter.type === 'encrypt' ? '암호화' :
-                                        filter.type === 'decrypt' ? '복호화' :
-                                        filter.type === 'url-encode' ? 'URL 인코딩' :
-                                        filter.type === 'url-decode' ? 'URL 디코딩' :
-                                        '체인 실행'
+                                            filter.type === 'decrypt' ? '복호화' :
+                                                filter.type === 'url-encode' ? 'URL 인코딩' :
+                                                    filter.type === 'url-decode' ? 'URL 디코딩' :
+                                                        '체인 실행'
                                     }</Tag>
                                 )}
                                 {filter.algorithm && <Tag>알고리즘: {filter.algorithm}</Tag>}
@@ -363,13 +387,12 @@ const HistoryPage: React.FC = () => {
 
                 {/* 상세 보기 모달 */}
                 <Modal
-                    title={`히스토리 상세 - ${
-                        selectedHistoryItem?.type === 'encrypt' ? '암호화' :
-                        selectedHistoryItem?.type === 'decrypt' ? '복호화' :
-                        selectedHistoryItem?.type === 'url-encode' ? 'URL 인코딩' :
-                        selectedHistoryItem?.type === 'url-decode' ? 'URL 디코딩' :
-                        '체인 실행'
-                    }`}
+                    title={`히스토리 상세 - ${selectedHistoryItem?.type === 'encrypt' ? '암호화' :
+                            selectedHistoryItem?.type === 'decrypt' ? '복호화' :
+                                selectedHistoryItem?.type === 'url-encode' ? 'URL 인코딩' :
+                                    selectedHistoryItem?.type === 'url-decode' ? 'URL 디코딩' :
+                                        '체인 실행'
+                        }`}
                     open={viewModalVisible}
                     onCancel={() => {
                         setViewModalVisible(false);

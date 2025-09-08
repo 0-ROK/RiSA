@@ -54,8 +54,9 @@ import { useHistory } from '../store/HistoryContext';
 import { ChainStep, ChainTemplate, ChainStepType, HistoryItem } from '../../shared/types';
 import { CHAIN_MODULES } from '../../shared/constants';
 import { SortableStepItem } from '../components/SortableStepItem';
+import PageHeader from '../components/PageHeader';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
@@ -117,111 +118,111 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
 
   return (
     <div style={{ opacity: step.enabled ? 1 : 0.5 }}>
-          <Card
-            size="small"
-            style={{
-              marginBottom: 8,
-              borderColor: getStepColor(step.type),
-              borderWidth: step.enabled ? 2 : 1,
-              backgroundColor: 'white',
-            }}
-            actions={[
-              <Tooltip title={step.enabled ? '비활성화' : '활성화'} key="toggle">
-                <Button
-                  type="text"
-                  icon={<CheckOutlined style={{ color: step.enabled ? '#52c41a' : '#d9d9d9' }} />}
-                  onClick={handleToggleEnabled}
-                />
-              </Tooltip>,
-              <Tooltip title="설정" key="settings">
-                <Button
-                  type="text"
-                  icon={<SettingOutlined />}
-                  onClick={() => setShowParams(!showParams)}
-                />
-              </Tooltip>,
-              <Tooltip title="삭제" key="delete">
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={onDelete}
-                />
-              </Tooltip>,
-            ]}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ marginRight: 8 }}>
-                <DragOutlined style={{ color: '#999' }} />
-              </div>
-              <div style={{ color: getStepColor(step.type), marginRight: 8 }}>
-                {getStepIcon(step.type)}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
-                  {index + 1}. {moduleInfo?.name || step.type}
-                  {/* RSA 스텝에서 키가 선택되지 않은 경우 경고 표시 */}
-                  {needsKeySelection && (!step.params || !step.params.keyId) && (
-                    <Tooltip title="키를 선택해주세요">
-                      <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
-                    </Tooltip>
-                  )}
-                </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  {moduleInfo?.description || ''}
-                  {needsKeySelection && step.params?.keyId && (
-                    <span style={{ color: '#52c41a', marginLeft: 8 }}>✓ 키 선택됨</span>
-                  )}
-                </div>
-              </div>
+      <Card
+        size="small"
+        style={{
+          marginBottom: 8,
+          borderColor: getStepColor(step.type),
+          borderWidth: step.enabled ? 2 : 1,
+          backgroundColor: 'white',
+        }}
+        actions={[
+          <Tooltip title={step.enabled ? '비활성화' : '활성화'} key="toggle">
+            <Button
+              type="text"
+              icon={<CheckOutlined style={{ color: step.enabled ? '#52c41a' : '#d9d9d9' }} />}
+              onClick={handleToggleEnabled}
+            />
+          </Tooltip>,
+          <Tooltip title="설정" key="settings">
+            <Button
+              type="text"
+              icon={<SettingOutlined />}
+              onClick={() => setShowParams(!showParams)}
+            />
+          </Tooltip>,
+          <Tooltip title="삭제" key="delete">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={onDelete}
+            />
+          </Tooltip>,
+        ]}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ marginRight: 8 }}>
+            <DragOutlined style={{ color: '#999' }} />
+          </div>
+          <div style={{ color: getStepColor(step.type), marginRight: 8 }}>
+            {getStepIcon(step.type)}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
+              {index + 1}. {moduleInfo?.name || step.type}
+              {/* RSA 스텝에서 키가 선택되지 않은 경우 경고 표시 */}
+              {needsKeySelection && (!step.params || !step.params.keyId) && (
+                <Tooltip title="키를 선택해주세요">
+                  <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
+                </Tooltip>
+              )}
             </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {moduleInfo?.description || ''}
+              {needsKeySelection && step.params?.keyId && (
+                <span style={{ color: '#52c41a', marginLeft: 8 }}>✓ 키 선택됨</span>
+              )}
+            </div>
+          </div>
+        </div>
 
-            {showParams && (
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
-                {needsKeySelection && (
-                  <div style={{ marginBottom: 8 }}>
-                    <Text strong>키 선택:</Text>
-                    <Select
-                      style={{ width: '100%', marginTop: 4 }}
-                      placeholder="키를 선택하세요"
-                      value={step.params?.keyId}
-                      onChange={(value) => handleParamChange('keyId', value)}
-                    >
-                      {availableKeys.map(key => (
-                        <Option key={key.id} value={key.id}>
-                          {key.name} ({key.keySize} bits)
-                        </Option>
-                      ))}
-                    </Select>
-                  </div>
-                )}
-
-                {needsKeySelection && (
-                  <div style={{ marginBottom: 8 }}>
-                    <Text strong>알고리즘:</Text>
-                    <Select
-                      style={{ width: '100%', marginTop: 4 }}
-                      value={step.params?.algorithm || 'RSA-OAEP'}
-                      onChange={(value) => handleParamChange('algorithm', value)}
-                    >
-                      <Option value="RSA-OAEP">RSA-OAEP (권장)</Option>
-                      <Option value="RSA-PKCS1">RSA-PKCS1</Option>
-                    </Select>
-                  </div>
-                )}
-
-                <div>
-                  <Text strong>사용자 정의 이름:</Text>
-                  <Input
-                    style={{ marginTop: 4 }}
-                    placeholder={moduleInfo?.name || step.type}
-                    value={step.name}
-                    onChange={(e) => onUpdate({ ...step, name: e.target.value })}
-                  />
-                </div>
+        {showParams && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
+            {needsKeySelection && (
+              <div style={{ marginBottom: 8 }}>
+                <Text strong>키 선택:</Text>
+                <Select
+                  style={{ width: '100%', marginTop: 4 }}
+                  placeholder="키를 선택하세요"
+                  value={step.params?.keyId}
+                  onChange={(value) => handleParamChange('keyId', value)}
+                >
+                  {availableKeys.map(key => (
+                    <Option key={key.id} value={key.id}>
+                      {key.name} ({key.keySize} bits)
+                    </Option>
+                  ))}
+                </Select>
               </div>
             )}
-          </Card>
+
+            {needsKeySelection && (
+              <div style={{ marginBottom: 8 }}>
+                <Text strong>알고리즘:</Text>
+                <Select
+                  style={{ width: '100%', marginTop: 4 }}
+                  value={step.params?.algorithm || 'RSA-OAEP'}
+                  onChange={(value) => handleParamChange('algorithm', value)}
+                >
+                  <Option value="RSA-OAEP">RSA-OAEP (권장)</Option>
+                  <Option value="RSA-PKCS1">RSA-PKCS1</Option>
+                </Select>
+              </div>
+            )}
+
+            <div>
+              <Text strong>사용자 정의 이름:</Text>
+              <Input
+                style={{ marginTop: 4 }}
+                placeholder={moduleInfo?.name || step.type}
+                value={step.name}
+                onChange={(e) => onUpdate({ ...step, name: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 };
@@ -343,20 +344,20 @@ const ChainBuilderPage: React.FC = () => {
 
   const handleToggleStep = (stepId: string) => {
     if (!currentTemplate) return;
-    
+
     const stepIndex = currentTemplate.steps.findIndex(s => s.id === stepId);
     if (stepIndex === -1) return;
-    
+
     const step = currentTemplate.steps[stepIndex];
     handleUpdateStep(stepIndex, { ...step, enabled: !step.enabled });
   };
 
   const handleUpdateStepParams = (stepId: string, updates: Partial<ChainStep>) => {
     if (!currentTemplate) return;
-    
+
     const stepIndex = currentTemplate.steps.findIndex(s => s.id === stepId);
     if (stepIndex === -1) return;
-    
+
     const step = currentTemplate.steps[stepIndex];
     handleUpdateStep(stepIndex, { ...step, ...updates });
   };
@@ -405,7 +406,7 @@ const ChainBuilderPage: React.FC = () => {
       } else {
         // 더 상세한 오류 정보 제공
         const failedStep = result.steps.find(step => !step.success);
-        const errorMsg = failedStep 
+        const errorMsg = failedStep
           ? `${failedStep.stepType} 스텝에서 오류: ${failedStep.error}`
           : '체인 실행 중 오류가 발생했습니다.';
         message.error(errorMsg);
@@ -468,17 +469,40 @@ const ChainBuilderPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '24px', height: '100vh', overflow: 'auto' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        <div style={{ marginBottom: 24 }}>
-          <Title level={2}>
-            <BulbOutlined style={{ marginRight: 8, color: '#faad14' }} />
-            체인 빌더
-          </Title>
-          <Paragraph type="secondary">
-            다양한 암호화/변환 작업을 순차적으로 연결하여 커스텀 체인을 만들고 실행하세요.
-          </Paragraph>
-        </div>
+    <div style={{
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0
+    }}>
+      <PageHeader 
+        title="체인 빌더"
+        subtitle="다양한 암호화/변환 작업을 순차적으로 연결하여 커스텀 체인을 만들고 실행하세요."
+        icon={<BulbOutlined style={{ color: '#faad14' }} />}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #f0f0f0'
+        }}
+      />
+      <div style={{
+        paddingTop: '100px',
+        padding: '0 24px 24px 24px',
+        maxWidth: 1400,
+        margin: '0 auto',
+        width: '100%',
+        height: '100%',
+        overflow: 'auto'
+      }}>
 
         <Row gutter={[24, 24]}>
           {/* 왼쪽: 체인 빌더 */}
@@ -590,11 +614,11 @@ const ChainBuilderPage: React.FC = () => {
                   const canExecute = currentTemplate && currentTemplate.steps.length > 0 && inputText.trim();
                   const validation = currentTemplate ? validateChainSteps(currentTemplate.steps) : { valid: false, errors: [] };
                   const hasValidationErrors = !validation.valid;
-                  
+
                   return (
                     <Space>
                       {hasValidationErrors && (
-                        <Tooltip 
+                        <Tooltip
                           title={
                             <div>
                               <div style={{ marginBottom: 4 }}>실행 불가 사유:</div>
