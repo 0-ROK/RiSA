@@ -84,36 +84,139 @@ const UpdateNotification: React.FC = () => {
 
   const formatReleaseNotes = (releaseNotes: string): React.ReactNode => {
     try {
-      // HTML 태그가 있는지 확인
-      const hasHtmlTags = /<[^>]*>/g.test(releaseNotes);
-      
-      if (hasHtmlTags) {
-        // HTML 태그 제거하고 마크다운 스타일로 변환
-        let formatted = releaseNotes
-          .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '## $1\n')
-          .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
-          .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
-          .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
-          .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
-          .replace(/<ul[^>]*>/gi, '')
-          .replace(/<\/ul>/gi, '')
-          .replace(/<li[^>]*>/gi, '• ')
-          .replace(/<\/li>/gi, '\n')
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/<p[^>]*>/gi, '')
-          .replace(/<\/p>/gi, '\n\n')
-          .replace(/<[^>]*>/g, '') // 남은 모든 HTML 태그 제거
-          .replace(/&nbsp;/gi, ' ')
-          .replace(/&lt;/gi, '<')
-          .replace(/&gt;/gi, '>')
-          .replace(/&amp;/gi, '&')
-          .trim();
+      const lines = releaseNotes.split('\n');
+      const elements: React.ReactNode[] = [];
+      let listItems: string[] = [];
+      let key = 0;
+
+      const flushList = () => {
+        if (listItems.length > 0) {
+          elements.push(
+            <ul key={key++} style={{ margin: '8px 0', paddingLeft: '16px' }}>
+              {listItems.map((item, index) => (
+                <li key={index} style={{ marginBottom: '4px' }}>
+                  <Text style={{ fontSize: 13 }}>{parseInlineMarkdown(item)}</Text>
+                </li>
+              ))}
+            </ul>
+          );
+          listItems = [];
+        }
+      };
+
+      const parseInlineMarkdown = (text: string): React.ReactNode => {
+        const parts: React.ReactNode[] = [];
+        let currentText = text;
+        let partKey = 0;
+
+        // Bold (**text**)
+        currentText = currentText.replace(/\*\*(.+?)\*\*/g, (_, content) => {
+          const placeholder = `__BOLD_${partKey}__`;
+          parts[partKey] = <Text key={partKey} strong style={{ fontSize: 13 }}>{content}</Text>;
+          partKey++;
+          return placeholder;
+        });
+
+        // Italic (*text* or _text_)
+        currentText = currentText.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, (_, content) => {
+          const placeholder = `__ITALIC_${partKey}__`;
+          parts[partKey] = <Text key={partKey} italic style={{ fontSize: 13 }}>{content}</Text>;
+          partKey++;
+          return placeholder;
+        });
+
+        currentText = currentText.replace(/_([^_]+?)_/g, (_, content) => {
+          const placeholder = `__ITALIC_${partKey}__`;
+          parts[partKey] = <Text key={partKey} italic style={{ fontSize: 13 }}>{content}</Text>;
+          partKey++;
+          return placeholder;
+        });
+
+        // Split by placeholders and combine
+        const finalParts: React.ReactNode[] = [];
+        const segments = currentText.split(/(__(?:BOLD|ITALIC)_\d+__)/);
         
-        return <Text style={{ fontSize: 13, fontFamily: 'inherit' }}>{formatted}</Text>;
+        segments.forEach((segment, index) => {
+          const match = segment.match(/^__(?:BOLD|ITALIC)_(\d+)__$/);
+          if (match) {
+            const partIndex = parseInt(match[1]);
+            finalParts.push(parts[partIndex]);
+          } else if (segment) {
+            finalParts.push(<span key={`text_${index}`}>{segment}</span>);
+          }
+        });
+
+        return finalParts.length > 1 ? <>{finalParts}</> : finalParts[0] || text;
+      };
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        if (!trimmedLine) {
+          flushList();
+          continue;
+        }
+
+        // Headers
+        if (trimmedLine.startsWith('# ')) {
+          flushList();
+          elements.push(
+            <Title key={key++} level={1} style={{ fontSize: 18, margin: '16px 0 8px 0', color: '#1890ff' }}>
+              {trimmedLine.slice(2)}
+            </Title>
+          );
+        } else if (trimmedLine.startsWith('## ')) {
+          flushList();
+          elements.push(
+            <Title key={key++} level={2} style={{ fontSize: 16, margin: '12px 0 6px 0', color: '#1890ff' }}>
+              {trimmedLine.slice(3)}
+            </Title>
+          );
+        } else if (trimmedLine.startsWith('### ')) {
+          flushList();
+          elements.push(
+            <Title key={key++} level={3} style={{ fontSize: 14, margin: '10px 0 4px 0', color: '#1890ff' }}>
+              {trimmedLine.slice(4)}
+            </Title>
+          );
+        } else if (trimmedLine.startsWith('#### ')) {
+          flushList();
+          elements.push(
+            <Title key={key++} level={4} style={{ fontSize: 13, margin: '8px 0 4px 0', color: '#1890ff' }}>
+              {trimmedLine.slice(5)}
+            </Title>
+          );
+        } 
+        // Horizontal rule
+        else if (trimmedLine === '---' || trimmedLine === '***') {
+          flushList();
+          elements.push(
+            <hr key={key++} style={{ 
+              border: 'none', 
+              borderTop: '1px solid #f0f0f0', 
+              margin: '16px 0' 
+            }} />
+          );
+        }
+        // List items
+        else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+          listItems.push(trimmedLine.slice(2));
+        }
+        // Regular text
+        else {
+          flushList();
+          elements.push(
+            <Text key={key++} style={{ fontSize: 13, display: 'block', marginBottom: '8px' }}>
+              {parseInlineMarkdown(trimmedLine)}
+            </Text>
+          );
+        }
       }
-      
-      // 일반 텍스트인 경우 그대로 표시
-      return <Text style={{ fontSize: 13, fontFamily: 'inherit' }}>{releaseNotes}</Text>;
+
+      // Flush any remaining list items
+      flushList();
+
+      return <div style={{ lineHeight: 1.6 }}>{elements}</div>;
     } catch (error) {
       console.error('릴리즈 노트 포맷팅 오류:', error);
       return <Text style={{ fontSize: 13, fontFamily: 'inherit' }}>{releaseNotes}</Text>;
