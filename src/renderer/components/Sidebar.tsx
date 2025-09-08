@@ -58,9 +58,12 @@ const Sidebar: React.FC = () => {
       }}
     >
       <div style={{
+        WebkitAppRegion: 'drag',
         padding: '16px',
         borderBottom: '1px solid #303030',
-        textAlign: 'center'
+        textAlign: 'center',
+        userSelect: 'none',
+        cursor: 'grab'
       }}>
         <LockOutlined style={{ fontSize: '24px', color: '#1890ff', marginRight: 8 }} />
         <Title
