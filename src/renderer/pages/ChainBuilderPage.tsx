@@ -398,6 +398,9 @@ const ChainBuilderPage: React.FC = () => {
       return;
     }
 
+    // 실행 시작 시 이전 결과 초기화
+    setExecutionResult(null);
+    setOutputText('');
     setIsExecuting(true);
     try {
       const result = await executeChain(
@@ -574,17 +577,23 @@ const ChainBuilderPage: React.FC = () => {
                     strategy={verticalListSortingStrategy}
                   >
                     <div>
-                      {currentTemplate.steps.map((step, index) => (
-                        <SortableStepItem
-                          key={step.id}
-                          step={step}
-                          index={index}
-                          savedKeys={keys}
-                          onToggle={handleToggleStep}
-                          onDelete={handleDeleteStep}
-                          onUpdateStep={handleUpdateStepParams}
-                        />
-                      ))}
+                      {currentTemplate.steps.map((step, index) => {
+                        // 해당 스텝의 실행 결과 찾기
+                        const stepResult = executionResult?.steps?.find((result: any) => result.stepId === step.id);
+                        
+                        return (
+                          <SortableStepItem
+                            key={step.id}
+                            step={step}
+                            index={index}
+                            savedKeys={keys}
+                            onToggle={handleToggleStep}
+                            onDelete={handleDeleteStep}
+                            onUpdateStep={handleUpdateStepParams}
+                            executionResult={stepResult}
+                          />
+                        );
+                      })}
                     </div>
                   </SortableContext>
                 </DndContext>
@@ -689,11 +698,50 @@ const ChainBuilderPage: React.FC = () => {
                     <div>
                       성공한 스텝: {executionResult.steps.filter((s: any) => s.success).length} / {executionResult.steps.length}
                     </div>
+                    
+                    {/* 스텝별 실행 상세 정보 */}
+                    {executionResult.steps.length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <Text strong style={{ fontSize: '12px' }}>스텝별 실행 결과:</Text>
+                        <div style={{ marginTop: 4 }}>
+                          {executionResult.steps.map((stepResult: any, index: number) => (
+                            <div 
+                              key={stepResult.stepId || index}
+                              style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center',
+                                padding: '2px 0',
+                                borderBottom: index < executionResult.steps.length - 1 ? '1px solid #f0f0f0' : 'none'
+                              }}
+                            >
+                              <span style={{ 
+                                color: stepResult.success ? '#52c41a' : '#ff4d4f',
+                                fontWeight: 500
+                              }}>
+                                {index + 1}. {stepResult.stepType}
+                              </span>
+                              <span style={{ color: '#666' }}>
+                                {stepResult.duration}ms
+                                {!stepResult.success && stepResult.error && (
+                                  <Tooltip title={stepResult.error}>
+                                    <span style={{ marginLeft: 4, color: '#ff4d4f' }}>⚠️</span>
+                                  </Tooltip>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     {executionResult.steps.some((s: any) => !s.success) && (
                       <Alert
                         type="warning"
                         message="일부 스텝에서 오류가 발생했습니다"
+                        description="위 스텝 목록에서 실패한 스텝을 확인하거나, 좌측 체인에서 상세한 오류 메시지를 확인하세요."
                         style={{ marginTop: 8 }}
+                        showIcon
                       />
                     )}
                   </div>

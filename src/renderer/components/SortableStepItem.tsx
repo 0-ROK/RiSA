@@ -1,9 +1,9 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, Switch, Select, Button, Tooltip } from 'antd';
-import { DeleteOutlined, LockOutlined, UnlockOutlined, MenuOutlined } from '@ant-design/icons';
-import { ChainStep, SavedKey } from '../../shared/types';
+import { Card, Switch, Select, Button, Tooltip, Alert } from 'antd';
+import { DeleteOutlined, LockOutlined, UnlockOutlined, MenuOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { ChainStep, SavedKey, ChainStepResult } from '../../shared/types';
 import { CHAIN_MODULES } from '../../shared/constants';
 
 interface SortableStepItemProps {
@@ -13,6 +13,7 @@ interface SortableStepItemProps {
   onToggle: (stepId: string) => void;
   onDelete: (stepId: string) => void;
   onUpdateStep: (stepId: string, updates: Partial<ChainStep>) => void;
+  executionResult?: ChainStepResult; // 실행 결과 추가
 }
 
 export const SortableStepItem: React.FC<SortableStepItemProps> = ({
@@ -22,6 +23,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   onToggle,
   onDelete,
   onUpdateStep,
+  executionResult,
 }) => {
   const {
     attributes,
@@ -43,6 +45,11 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   const needsKeySelection = step.type === 'rsa-encrypt' || step.type === 'rsa-decrypt';
   const hasValidKey = needsKeySelection && step.params?.keyId;
   const hasWarning = needsKeySelection && (!step.params || !step.params.keyId);
+  
+  // 실행 결과 상태
+  const hasExecutionResult = executionResult && executionResult.stepId === step.id;
+  const isSuccess = hasExecutionResult && executionResult.success;
+  const isError = hasExecutionResult && !executionResult.success;
 
   const getStepIcon = () => {
     switch (step.type) {
@@ -62,7 +69,11 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
         style={{
           marginBottom: 8,
           opacity: step.enabled ? 1 : 0.6,
-          border: hasWarning ? '1px solid #ff4d4f' : undefined,
+          border: hasWarning ? '1px solid #ff4d4f' : 
+                  isError ? '1px solid #ff4d4f' :
+                  isSuccess ? '1px solid #52c41a' : undefined,
+          backgroundColor: isError ? '#fff2f0' : 
+                          isSuccess ? '#f6ffed' : undefined,
         }}
         styles={{ body: { padding: '12px 16px' } }}
         extra={
@@ -131,6 +142,17 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                   <span style={{ color: '#ff4d4f' }}>⚠️</span>
                 </Tooltip>
               )}
+              {/* 실행 결과 상태 표시 */}
+              {isSuccess && (
+                <Tooltip title={`실행 성공 (${executionResult?.duration}ms)`}>
+                  <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '14px' }} />
+                </Tooltip>
+              )}
+              {isError && (
+                <Tooltip title={`실행 실패: ${executionResult?.error}`}>
+                  <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: '14px' }} />
+                </Tooltip>
+              )}
             </div>
             
             {moduleInfo?.description && (
@@ -188,6 +210,17 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* 오류 메시지 표시 */}
+            {isError && executionResult?.error && (
+              <Alert
+                message="실행 오류"
+                description={executionResult.error}
+                type="error"
+                style={{ marginTop: 8 }}
+                showIcon
+              />
             )}
           </div>
         </div>
