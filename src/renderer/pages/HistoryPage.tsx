@@ -143,12 +143,14 @@ const HistoryPage: React.FC = () => {
             dataIndex: 'type',
             key: 'type',
             width: 80,
-            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'chain') => {
+            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'base64-encode' | 'base64-decode' | 'chain') => {
                 const tagInfo = {
                     'encrypt': { color: 'blue', text: '암호화' },
                     'decrypt': { color: 'green', text: '복호화' },
                     'url-encode': { color: 'purple', text: 'URL 인코딩' },
                     'url-decode': { color: 'orange', text: 'URL 디코딩' },
+                    'base64-encode': { color: 'cyan', text: 'Base64 인코딩' },
+                    'base64-decode': { color: 'geekblue', text: 'Base64 디코딩' },
                     'chain': { color: 'gold', text: '체인 실행' }
                 };
                 return (
@@ -164,8 +166,10 @@ const HistoryPage: React.FC = () => {
             key: 'keyName',
             width: 150,
             render: (keyName: string, record: HistoryItem) => {
-                // URL 작업이나 체인 작업의 경우
-                if (record.type === 'url-encode' || record.type === 'url-decode' || record.type === 'chain') {
+                // 인코딩 작업이나 체인 작업의 경우
+                if (record.type === 'url-encode' || record.type === 'url-decode' || 
+                    record.type === 'base64-encode' || record.type === 'base64-decode' || 
+                    record.type === 'chain') {
                     if (record.type === 'chain') {
                         return (
                             <div>
@@ -360,7 +364,7 @@ const HistoryPage: React.FC = () => {
                             showTotal: (total, range) => `${range[0]}-${range[1]} / 총 ${total}개`,
                         }}
                         locale={{
-                            emptyText: '히스토리가 없습니다. 암호화/복호화 또는 URL 인코딩/디코딩을 실행하면 히스토리가 기록됩니다.',
+                            emptyText: '히스토리가 없습니다. 암호화/복호화 또는 인코딩/디코딩을 실행하면 히스토리가 기록됩니다.',
                         }}
                         scroll={{ x: 1000 }}
                     />
@@ -372,7 +376,9 @@ const HistoryPage: React.FC = () => {
                             selectedHistoryItem?.type === 'decrypt' ? '복호화' :
                                 selectedHistoryItem?.type === 'url-encode' ? 'URL 인코딩' :
                                     selectedHistoryItem?.type === 'url-decode' ? 'URL 디코딩' :
-                                        '체인 실행'
+                                        selectedHistoryItem?.type === 'base64-encode' ? 'Base64 인코딩' :
+                                            selectedHistoryItem?.type === 'base64-decode' ? 'Base64 디코딩' :
+                                                '체인 실행'
                         }`}
                     open={viewModalVisible}
                     onCancel={() => {
@@ -507,6 +513,8 @@ const HistoryPage: React.FC = () => {
                                 <Select.Option value="decrypt">복호화</Select.Option>
                                 <Select.Option value="url-encode">URL 인코딩</Select.Option>
                                 <Select.Option value="url-decode">URL 디코딩</Select.Option>
+                                <Select.Option value="base64-encode">Base64 인코딩</Select.Option>
+                                <Select.Option value="base64-decode">Base64 디코딩</Select.Option>
                                 <Select.Option value="chain">체인 실행</Select.Option>
                             </Select>
                         </Form.Item>

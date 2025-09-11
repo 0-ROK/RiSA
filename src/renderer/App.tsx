@@ -5,7 +5,7 @@ import Sidebar from './components/Sidebar';
 import MainPage from './pages/MainPage';
 import KeyManagerPage from './pages/KeyManagerPage';
 import HistoryPage from './pages/HistoryPage';
-import URLToolsPage from './pages/URLToolsPage';
+import EncodingToolsPage from './pages/EncodingToolsPage';
 import ChainBuilderPage from './pages/ChainBuilderPage';
 import UpdateNotification from './components/UpdateNotification';
 
@@ -24,7 +24,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<MainPage />} />
             <Route path="/keys" element={<KeyManagerPage />} />
-            <Route path="/url-tools" element={<URLToolsPage />} />
+            <Route path="/encoding-tools" element={<EncodingToolsPage />} />
             <Route path="/chain-builder" element={<ChainBuilderPage />} />
             <Route path="/history" element={<HistoryPage />} />
           </Routes>

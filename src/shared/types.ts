@@ -87,16 +87,16 @@ export interface ChainModule {
 
 export interface HistoryItem {
   id: string;
-  type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'chain';
-  keyId?: string;  // Optional for URL operations and chains
-  keyName?: string;  // Optional for URL operations and chains
-  algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';  // Optional for URL operations and chains
+  type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'base64-encode' | 'base64-decode' | 'chain';
+  keyId?: string;  // Optional for encoding operations and chains
+  keyName?: string;  // Optional for encoding operations and chains
+  algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';  // Optional for encoding operations and chains
   inputText: string;
   outputText: string;
   success: boolean;
   errorMessage?: string;
   timestamp: Date;
-  keySize?: number;  // Optional for URL operations and chains
+  keySize?: number;  // Optional for encoding operations and chains
   // Chain-specific fields
   chainId?: string;
   chainName?: string;
@@ -105,7 +105,7 @@ export interface HistoryItem {
 }
 
 export interface HistoryFilter {
-  type?: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'chain';
+  type?: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'base64-encode' | 'base64-decode' | 'chain';
   keyId?: string;
   algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';
   success?: boolean;
