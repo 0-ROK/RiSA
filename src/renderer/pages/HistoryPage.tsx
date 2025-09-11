@@ -128,7 +128,7 @@ const HistoryPage: React.FC = () => {
             title: '시간',
             dataIndex: 'timestamp',
             key: 'timestamp',
-            width: 160,
+            width: 150,
             render: (timestamp: Date) => (
                 <Text style={{ fontSize: '12px' }}>
                     {new Date(timestamp).toLocaleString('ko-KR')}
@@ -142,7 +142,7 @@ const HistoryPage: React.FC = () => {
             title: '유형',
             dataIndex: 'type',
             key: 'type',
-            width: 80,
+            width: 130,
             render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'base64-encode' | 'base64-decode' | 'chain') => {
                 const tagInfo = {
                     'encrypt': { color: 'blue', text: '암호화' },
@@ -204,7 +204,7 @@ const HistoryPage: React.FC = () => {
             title: '상태',
             dataIndex: 'success',
             key: 'success',
-            width: 80,
+            width: 70,
             render: (success: boolean) => (
                 <Tag color={success ? 'success' : 'error'}>
                     {success ? '성공' : '실패'}
@@ -216,23 +216,52 @@ const HistoryPage: React.FC = () => {
             dataIndex: 'inputText',
             key: 'inputText',
             ellipsis: true,
+            width: 200,
             render: (inputText: string) => (
                 <Text
                     ellipsis={{ tooltip: true }}
                     style={{
                         fontFamily: 'monospace',
                         fontSize: '12px',
-                        maxWidth: '200px'
+                        maxWidth: '180px'
                     }}
                 >
-                    {inputText.substring(0, 50)}...
+                    {inputText.substring(0, 50)}{inputText.length > 50 ? '...' : ''}
                 </Text>
             ),
         },
         {
+            title: '출력 텍스트 (미리보기)',
+            dataIndex: 'outputText',
+            key: 'outputText',
+            ellipsis: true,
+            width: 200,
+            render: (outputText: string, record: HistoryItem) => {
+                if (!record.success || !outputText) {
+                    return (
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            {record.success ? '-' : '실패'}
+                        </Text>
+                    );
+                }
+                return (
+                    <Text
+                        ellipsis={{ tooltip: outputText.length <= 100 ? outputText : true }}
+                        style={{
+                            fontFamily: 'monospace',
+                            fontSize: '12px',
+                            maxWidth: '180px'
+                        }}
+                    >
+                        {outputText.substring(0, 50)}{outputText.length > 50 ? '...' : ''}
+                    </Text>
+                );
+            },
+        },
+        {
             title: '작업',
             key: 'actions',
-            width: 120,
+            width: 100,
             render: (_: any, record: HistoryItem) => (
                 <Space size="small">
                     <Tooltip title="상세 보기">
@@ -366,7 +395,7 @@ const HistoryPage: React.FC = () => {
                         locale={{
                             emptyText: '히스토리가 없습니다. 암호화/복호화 또는 인코딩/디코딩을 실행하면 히스토리가 기록됩니다.',
                         }}
-                        scroll={{ x: 1000 }}
+                        scroll={{ x: 1200 }}
                     />
                 </Card>
 
