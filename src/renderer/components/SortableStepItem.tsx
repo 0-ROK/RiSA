@@ -74,8 +74,10 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                   isSuccess ? '1px solid #52c41a' : undefined,
           backgroundColor: isError ? '#fff2f0' : 
                           isSuccess ? '#f6ffed' : undefined,
+          width: '100%',
+          overflow: 'hidden'
         }}
-        styles={{ body: { padding: '12px 16px' } }}
+        styles={{ body: { padding: '12px 16px', overflow: 'hidden' } }}
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Switch
@@ -119,7 +121,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
           </div>
 
           {/* 스텝 정보 */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               {getStepIcon()}
               <span style={{ fontWeight: 500, fontSize: '14px' }}>
@@ -163,7 +165,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
 
             {/* RSA 키 및 알고리즘 선택 */}
             {needsKeySelection && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: 8, width: '100%' }}>
                 <div style={{ marginBottom: 8 }}>
                   <Select
                     placeholder="RSA 키 선택"
@@ -179,7 +181,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                         }
                       });
                     }}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', maxWidth: '100%' }}
                     size="small"
                   >
                     {savedKeys.map(key => (
@@ -201,7 +203,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                       onChange={(algorithm) => onUpdateStep(step.id, {
                         params: { ...step.params, algorithm }
                       })}
-                      style={{ width: '100%' }}
+                      style={{ width: '100%', maxWidth: '100%' }}
                       size="small"
                     >
                       <Select.Option value="RSA-OAEP">RSA-OAEP (권장)</Select.Option>
@@ -216,9 +218,21 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
             {isError && executionResult?.error && (
               <Alert
                 message="실행 오류"
-                description={executionResult.error}
+                description={
+                  <div style={{ 
+                    wordBreak: 'break-word',
+                    maxWidth: '100%',
+                    fontSize: '12px'
+                  }}>
+                    {executionResult.error}
+                  </div>
+                }
                 type="error"
-                style={{ marginTop: 8 }}
+                style={{ 
+                  marginTop: 8,
+                  maxWidth: '100%',
+                  width: '100%'
+                }}
                 showIcon
               />
             )}
