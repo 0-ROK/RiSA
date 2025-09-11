@@ -90,7 +90,8 @@ export class ChainExecutor {
       throw new Error(`Key with ID ${keyId} not found`);
     }
 
-    const algorithm = step.params?.algorithm || 'RSA-OAEP';
+    // 알고리즘 우선순위: 스텝 설정 > 키의 선호 알고리즘 > 기본값 (RSA-OAEP)
+    const algorithm = step.params?.algorithm || key.preferredAlgorithm || 'RSA-OAEP';
     const rsaKey = new NodeRSA();
 
     try {
@@ -124,7 +125,8 @@ export class ChainExecutor {
       throw new Error(`Key with ID ${keyId} not found`);
     }
 
-    const algorithm = step.params?.algorithm || 'RSA-OAEP';
+    // 알고리즘 우선순위: 스텝 설정 > 키의 선호 알고리즘 > 기본값 (RSA-OAEP)
+    const algorithm = step.params?.algorithm || key.preferredAlgorithm || 'RSA-OAEP';
     const rsaKey = new NodeRSA();
 
     try {

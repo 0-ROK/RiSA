@@ -359,6 +359,15 @@ const ChainBuilderPage: React.FC = () => {
     if (stepIndex === -1) return;
 
     const step = currentTemplate.steps[stepIndex];
+    
+    // 키 ID가 변경된 경우, 해당 키의 선호 알고리즘을 자동 설정
+    if (updates.params?.keyId && updates.params.keyId !== step.params?.keyId) {
+      const selectedKey = keys.find(key => key.id === updates.params?.keyId);
+      if (selectedKey && selectedKey.preferredAlgorithm && !updates.params.algorithm) {
+        updates.params.algorithm = selectedKey.preferredAlgorithm;
+      }
+    }
+    
     handleUpdateStep(stepIndex, { ...step, ...updates });
   };
 

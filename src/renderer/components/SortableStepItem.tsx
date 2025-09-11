@@ -139,24 +139,54 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
               </div>
             )}
 
-            {/* RSA 키 선택 */}
+            {/* RSA 키 및 알고리즘 선택 */}
             {needsKeySelection && (
               <div style={{ marginTop: 8 }}>
-                <Select
-                  placeholder="RSA 키 선택"
-                  value={step.params?.keyId}
-                  onChange={(keyId) => onUpdateStep(step.id, {
-                    params: { ...step.params, keyId }
-                  })}
-                  style={{ width: '100%' }}
-                  size="small"
-                >
-                  {savedKeys.map(key => (
-                    <Select.Option key={key.id} value={key.id}>
-                      {key.name} ({key.keySize} bits)
-                    </Select.Option>
-                  ))}
-                </Select>
+                <div style={{ marginBottom: 8 }}>
+                  <Select
+                    placeholder="RSA 키 선택"
+                    value={step.params?.keyId}
+                    onChange={(keyId) => {
+                      const selectedKey = savedKeys.find(key => key.id === keyId);
+                      onUpdateStep(step.id, {
+                        params: { 
+                          ...step.params, 
+                          keyId,
+                          // 키 선택 시 해당 키의 선호 알고리즘을 자동 설정 (기존 설정이 없는 경우만)
+                          algorithm: step.params?.algorithm || selectedKey?.preferredAlgorithm || 'RSA-OAEP'
+                        }
+                      });
+                    }}
+                    style={{ width: '100%' }}
+                    size="small"
+                  >
+                    {savedKeys.map(key => (
+                      <Select.Option key={key.id} value={key.id}>
+                        {key.name} ({key.keySize} bits)
+                        {key.preferredAlgorithm && (
+                          <span style={{ color: '#666', fontSize: '11px' }}> - {key.preferredAlgorithm}</span>
+                        )}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>
+                
+                {step.params?.keyId && (
+                  <div>
+                    <Select
+                      placeholder="알고리즘 선택"
+                      value={step.params?.algorithm || savedKeys.find(k => k.id === step.params?.keyId)?.preferredAlgorithm || 'RSA-OAEP'}
+                      onChange={(algorithm) => onUpdateStep(step.id, {
+                        params: { ...step.params, algorithm }
+                      })}
+                      style={{ width: '100%' }}
+                      size="small"
+                    >
+                      <Select.Option value="RSA-OAEP">RSA-OAEP (권장)</Select.Option>
+                      <Select.Option value="RSA-PKCS1">RSA-PKCS1</Select.Option>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
           </div>
