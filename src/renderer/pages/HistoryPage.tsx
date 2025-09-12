@@ -143,7 +143,7 @@ const HistoryPage: React.FC = () => {
             dataIndex: 'type',
             key: 'type',
             width: 130,
-            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'base64-encode' | 'base64-decode' | 'chain') => {
+            render: (type: 'encrypt' | 'decrypt' | 'url-encode' | 'url-decode' | 'base64-encode' | 'base64-decode' | 'chain' | 'http-parse' | 'http-build') => {
                 const tagInfo = {
                     'encrypt': { color: 'blue', text: '암호화' },
                     'decrypt': { color: 'green', text: '복호화' },
@@ -151,7 +151,9 @@ const HistoryPage: React.FC = () => {
                     'url-decode': { color: 'orange', text: 'URL 디코딩' },
                     'base64-encode': { color: 'cyan', text: 'Base64 인코딩' },
                     'base64-decode': { color: 'geekblue', text: 'Base64 디코딩' },
-                    'chain': { color: 'gold', text: '체인 실행' }
+                    'chain': { color: 'gold', text: '체인 실행' },
+                    'http-parse': { color: 'red', text: 'HTTP 파싱' },
+                    'http-build': { color: 'lime', text: 'HTTP 생성' }
                 };
                 return (
                     <Tag color={tagInfo[type].color}>
@@ -166,10 +168,10 @@ const HistoryPage: React.FC = () => {
             key: 'keyName',
             width: 150,
             render: (keyName: string, record: HistoryItem) => {
-                // 인코딩 작업이나 체인 작업의 경우
+                // 인코딩 작업이나 체인 작업, HTTP Parser 작업의 경우
                 if (record.type === 'url-encode' || record.type === 'url-decode' || 
                     record.type === 'base64-encode' || record.type === 'base64-decode' || 
-                    record.type === 'chain') {
+                    record.type === 'chain' || record.type === 'http-parse' || record.type === 'http-build') {
                     if (record.type === 'chain') {
                         return (
                             <div>
@@ -544,6 +546,8 @@ const HistoryPage: React.FC = () => {
                                 <Select.Option value="url-decode">URL 디코딩</Select.Option>
                                 <Select.Option value="base64-encode">Base64 인코딩</Select.Option>
                                 <Select.Option value="base64-decode">Base64 디코딩</Select.Option>
+                                <Select.Option value="http-parse">HTTP 파싱</Select.Option>
+                                <Select.Option value="http-build">HTTP 생성</Select.Option>
                                 <Select.Option value="chain">체인 실행</Select.Option>
                             </Select>
                         </Form.Item>

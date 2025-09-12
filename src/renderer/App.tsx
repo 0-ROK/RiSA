@@ -7,6 +7,7 @@ import KeyManagerPage from './pages/KeyManagerPage';
 import HistoryPage from './pages/HistoryPage';
 import EncodingToolsPage from './pages/EncodingToolsPage';
 import ChainBuilderPage from './pages/ChainBuilderPage';
+import HttpParserPage from './pages/HttpParserPage';
 import UpdateNotification from './components/UpdateNotification';
 
 const { Content } = Layout;
@@ -25,6 +26,7 @@ const App: React.FC = () => {
             <Route path="/" element={<MainPage />} />
             <Route path="/keys" element={<KeyManagerPage />} />
             <Route path="/encoding-tools" element={<EncodingToolsPage />} />
+            <Route path="/http-parser" element={<HttpParserPage />} />
             <Route path="/chain-builder" element={<ChainBuilderPage />} />
             <Route path="/history" element={<HistoryPage />} />
           </Routes>
