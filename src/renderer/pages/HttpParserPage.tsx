@@ -497,12 +497,12 @@ const HttpParserPage: React.FC = () => {
     setShowTemplateSuggestions(false);
   };
 
-  const handleCopy = async (text: string) => {
+  const handleCopy = async (text: string, description?: string) => {
     try {
       await navigator.clipboard.writeText(text);
       notification.success({
         message: '복사됨',
-        description: '클립보드에 복사되었습니다.',
+        description: description || '클립보드에 복사되었습니다.',
         icon: <CheckOutlined style={{ color: '#52c41a' }} />,
         placement: 'topRight',
         duration: 2,
@@ -515,6 +515,17 @@ const HttpParserPage: React.FC = () => {
         duration: 3,
       });
     }
+  };
+
+  const handleCopyParams = async (params: Record<string, string>, type: 'path' | 'query') => {
+    const jsonString = JSON.stringify(params, null, 2);
+    const typeName = type === 'path' ? '경로 파라미터' : '쿼리 파라미터';
+    await handleCopy(jsonString, `${typeName} JSON이 클립보드에 복사되었습니다.`);
+  };
+
+  const handleCopySingleParam = async (key: string, value: string, type: 'path' | 'query') => {
+    const typeName = type === 'path' ? '경로 파라미터' : '쿼리 파라미터';
+    await handleCopy(value, `${typeName} "${key}"의 값이 클립보드에 복사되었습니다.`);
   };
 
   const handleClear = () => {
@@ -630,7 +641,17 @@ const HttpParserPage: React.FC = () => {
         {Object.keys(resultToShow.pathParams).length > 0 && (
           <>
             <Divider orientation="left" plain>
-              <Text strong>경로 파라미터 ({Object.keys(resultToShow.pathParams).length}개)</Text>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text strong>경로 파라미터 ({Object.keys(resultToShow.pathParams).length}개)</Text>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => handleCopyParams(resultToShow.pathParams, 'path')}
+                  title="경로 파라미터를 JSON으로 복사"
+                >
+                  JSON 복사
+                </Button>
+              </div>
             </Divider>
             <Space wrap>
               {Object.entries(resultToShow.pathParams).map(([key, value]) => {
@@ -648,6 +669,15 @@ const HttpParserPage: React.FC = () => {
                         <Text>값: {value}</Text>
                         <br />
                         <Text>타입: {type}</Text>
+                        <br />
+                        <Button
+                          size="small"
+                          icon={<CopyOutlined />}
+                          onClick={() => handleCopySingleParam(key, value, 'path')}
+                          style={{ marginTop: 8 }}
+                        >
+                          값 복사
+                        </Button>
                       </div>
                     }
                     title="파라미터 세부 정보"
@@ -666,13 +696,46 @@ const HttpParserPage: React.FC = () => {
         {Object.keys(resultToShow.queryParams).length > 0 && (
           <>
             <Divider orientation="left" plain>
-              <Text strong>쿼리 파라미터 ({Object.keys(resultToShow.queryParams).length}개)</Text>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text strong>쿼리 파라미터 ({Object.keys(resultToShow.queryParams).length}개)</Text>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => handleCopyParams(resultToShow.queryParams, 'query')}
+                  title="쿼리 파라미터를 JSON으로 복사"
+                >
+                  JSON 복사
+                </Button>
+              </div>
             </Divider>
             <Space wrap>
               {Object.entries(resultToShow.queryParams).map(([key, value]) => (
-                <Tag key={key} color="green">
-                  <strong>{key}</strong>: {value}
-                </Tag>
+                <Popover
+                  key={key}
+                  content={
+                    <div>
+                      <Text strong>쿼리 파라미터 정보</Text>
+                      <br />
+                      <Text>이름: {key}</Text>
+                      <br />
+                      <Text>값: {value}</Text>
+                      <br />
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => handleCopySingleParam(key, value, 'query')}
+                        style={{ marginTop: 8 }}
+                      >
+                        값 복사
+                      </Button>
+                    </div>
+                  }
+                  title="쿼리 파라미터 세부 정보"
+                >
+                  <Tag color="green" style={{ cursor: 'pointer' }}>
+                    <strong>{key}</strong>: {value}
+                  </Tag>
+                </Popover>
               ))}
             </Space>
           </>
@@ -759,7 +822,7 @@ const HttpParserPage: React.FC = () => {
               <Col span={12}>
                 <Card
                   title="URL 입력"
-                  style={{ height: '300px', display: 'flex', flexDirection: 'column' }}
+                  style={{ height: '500px', display: 'flex', flexDirection: 'column' }}
                   styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column' } }}
                 >
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -873,7 +936,7 @@ const HttpParserPage: React.FC = () => {
               </Col>
               
               <Col span={12}>
-                <div style={{ height: '300px', overflow: 'auto' }}>
+                <div style={{ height: '500px', overflow: 'auto' }}>
                   {(realtimeParsedResult || parsedResult) && renderParsedResult(realtimeParsedResult || parsedResult)}
                   {!realtimeParsedResult && !parsedResult && inputUrl.trim() && (
                     <Card title="파싱 결과" style={{ height: '100%' }}>
@@ -881,7 +944,7 @@ const HttpParserPage: React.FC = () => {
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center', 
-                        height: '200px',
+                        height: '400px',
                         color: '#999',
                         textAlign: 'center'
                       }}>
