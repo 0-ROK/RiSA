@@ -48,8 +48,8 @@ interface PathSegment {
 
 interface TemplateAnalysis {
   segments: PathSegment[];
-  confidence: number;
   suggestedTemplate: string;
+  dynamicCount: number;
 }
 
 interface ParsedUrl {
@@ -181,9 +181,8 @@ const HttpParserPage: React.FC = () => {
         };
       });
 
-      // 신뢰도 계산 (동적 파라미터가 많을수록 높음)
+      // 동적 파라미터 개수 계산
       const dynamicCount = segments.filter(s => s.isDynamic).length;
-      const confidence = Math.min(dynamicCount / Math.max(segments.length, 1) * 100, 95);
 
       // 템플릿 생성
       const suggestedTemplate = '/' + segments.map(segment => 
@@ -192,8 +191,8 @@ const HttpParserPage: React.FC = () => {
 
       return {
         segments,
-        confidence,
-        suggestedTemplate
+        suggestedTemplate,
+        dynamicCount
       };
     } catch (error) {
       return null;
@@ -242,7 +241,7 @@ const HttpParserPage: React.FC = () => {
     if (mode === 'parse' && inputUrl.trim()) {
       const analysis = analyzeUrlForTemplate(inputUrl);
       setTemplateAnalysis(analysis);
-      if (analysis && analysis.confidence > 30 && !pathTemplate) {
+      if (analysis && analysis.dynamicCount > 0 && !pathTemplate) {
         setShowTemplateSuggestions(true);
       }
     } else {
@@ -784,8 +783,8 @@ const HttpParserPage: React.FC = () => {
                     
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 템플릿 (선택사항)</Text>
-                      {templateAnalysis && templateAnalysis.confidence > 30 && (
-                        <Tooltip title={`신뢰도: ${templateAnalysis.confidence.toFixed(0)}%`}>
+                      {templateAnalysis && templateAnalysis.dynamicCount > 0 && (
+                        <Tooltip title={`${templateAnalysis.dynamicCount}개의 동적 파라미터 감지됨`}>
                           <Button
                             size="small"
                             icon={<BulbOutlined />}
@@ -793,7 +792,7 @@ const HttpParserPage: React.FC = () => {
                             style={{ marginLeft: 8 }}
                             type={showTemplateSuggestions ? "primary" : "default"}
                           >
-                            자동 감지
+                            자동 감지 ({templateAnalysis.dynamicCount})
                           </Button>
                         </Tooltip>
                       )}
@@ -808,9 +807,11 @@ const HttpParserPage: React.FC = () => {
                     
                     {showTemplateSuggestions && templateAnalysis && (
                       <div style={{ marginBottom: 12, padding: '12px', backgroundColor: '#f0f9ff', border: '1px solid #bae7ff', borderRadius: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                          <InfoCircleOutlined style={{ color: '#1890ff', marginRight: 4 }} />
-                          <Text strong style={{ color: '#1890ff' }}>템플릿 제안 (신뢰도: {templateAnalysis.confidence.toFixed(0)}%)</Text>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                          <BulbOutlined style={{ color: '#1890ff', marginRight: 4 }} />
+                          <Text strong style={{ color: '#1890ff' }}>
+                            템플릿 제안 - {templateAnalysis.dynamicCount}개의 동적 파라미터 발견
+                          </Text>
                           <Button 
                             type="text" 
                             size="small" 
@@ -820,22 +821,28 @@ const HttpParserPage: React.FC = () => {
                             ✕
                           </Button>
                         </div>
-                        <div style={{ marginBottom: 8 }}>
+                        
+                        <div style={{ marginBottom: 12, padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e1f5fe' }}>
+                          <Text code style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                            {templateAnalysis.suggestedTemplate}
+                          </Text>
+                        </div>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                              감지된 파라미터: {templateAnalysis.segments.filter(s => s.isDynamic).map(s => 
+                                `${s.paramName} (${s.paramType})`
+                              ).join(', ')}
+                            </Text>
+                          </div>
                           <Button
                             size="small"
                             type="primary"
                             onClick={() => applyTemplateSuggestion(templateAnalysis.suggestedTemplate)}
-                            style={{ marginRight: 8 }}
                           >
-                            {templateAnalysis.suggestedTemplate} 적용
+                            적용
                           </Button>
-                        </div>
-                        <div>
-                          <Text type="secondary" style={{ fontSize: '12px' }}>
-                            동적 세그먼트: {templateAnalysis.segments.filter(s => s.isDynamic).map(s => 
-                              `${s.value} (${s.paramType})`
-                            ).join(', ')}
-                          </Text>
                         </div>
                       </div>
                     )}
