@@ -418,10 +418,12 @@ const HistoryPage: React.FC = () => {
                     }}
                     width={800}
                     style={{ top: 20 }}
-                    bodyStyle={{
-                        maxHeight: 'calc(100vh - 200px)',
-                        overflowY: 'auto',
-                        padding: '24px'
+                    styles={{
+                        body: {
+                            maxHeight: 'calc(100vh - 200px)',
+                            overflowY: 'auto',
+                            padding: '24px'
+                        }
                     }}
                     footer={[
                         <Button key="close" onClick={() => setViewModalVisible(false)}>

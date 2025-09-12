@@ -13,7 +13,9 @@ import {
   Radio,
   Descriptions,
   Tag,
-  Divider
+  Divider,
+  Tooltip,
+  Popover
 } from 'antd';
 import {
   LinkOutlined,
@@ -23,7 +25,9 @@ import {
   CheckOutlined,
   CloseCircleOutlined,
   ApiOutlined,
-  EditOutlined
+  EditOutlined,
+  BulbOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import { useHistory } from '../store/HistoryContext';
 import { HistoryItem } from '../../shared/types';
@@ -33,6 +37,20 @@ const { TextArea } = Input;
 const { Text } = Typography;
 
 type OperationMode = 'parse' | 'build';
+
+interface PathSegment {
+  value: string;
+  isDynamic: boolean;
+  paramName?: string;
+  paramType?: 'number' | 'uuid' | 'string';
+  suggestions?: string[];
+}
+
+interface TemplateAnalysis {
+  segments: PathSegment[];
+  confidence: number;
+  suggestedTemplate: string;
+}
 
 interface ParsedUrl {
   protocol: string;
@@ -68,6 +86,190 @@ const HttpParserPage: React.FC = () => {
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [fullScreenType, setFullScreenType] = useState<'input' | 'output' | 'template'>('input');
   const [fullScreenContent, setFullScreenContent] = useState('');
+  const [templateAnalysis, setTemplateAnalysis] = useState<TemplateAnalysis | null>(null);
+  const [showTemplateSuggestions, setShowTemplateSuggestions] = useState(false);
+  const [templateMatchStatus, setTemplateMatchStatus] = useState<'success' | 'warning' | 'error' | null>(null);
+  const [realtimeParsedResult, setRealtimeParsedResult] = useState<ParsedUrl | null>(null);
+
+  // 자동 템플릿 분석 함수들
+  const detectParamType = (value: string): 'number' | 'uuid' | 'string' => {
+    // UUID 패턴 검사
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(value)) {
+      return 'uuid';
+    }
+    
+    // 숫자 패턴 검사
+    if (/^\d+$/.test(value) && value.length > 0) {
+      return 'number';
+    }
+    
+    return 'string';
+  };
+
+  const generateParamName = (value: string, index: number, pathSegments: string[]): string => {
+    const type = detectParamType(value);
+    const prevSegment = index > 0 ? pathSegments[index - 1] : '';
+    
+    // 이전 세그먼트에 따른 파라미터 이름 추론
+    if (prevSegment) {
+      const singularMap: Record<string, string> = {
+        'users': 'userId',
+        'posts': 'postId',
+        'comments': 'commentId',
+        'products': 'productId',
+        'orders': 'orderId',
+        'categories': 'categoryId',
+        'files': 'fileId',
+        'projects': 'projectId',
+        'tasks': 'taskId',
+        'teams': 'teamId'
+      };
+      
+      if (singularMap[prevSegment.toLowerCase()]) {
+        return singularMap[prevSegment.toLowerCase()];
+      }
+      
+      // 복수형을 단수형으로 변환하고 Id 추가
+      if (prevSegment.endsWith('s')) {
+        return `${prevSegment.slice(0, -1)}Id`;
+      }
+    }
+    
+    // 타입에 따른 기본 이름
+    switch (type) {
+      case 'uuid':
+        return 'uuid';
+      case 'number':
+        return 'id';
+      default:
+        return 'param';
+    }
+  };
+
+  const analyzeUrlForTemplate = (urlString: string): TemplateAnalysis | null => {
+    try {
+      const url = new URL(urlString);
+      const pathSegments = url.pathname.split('/').filter(segment => segment);
+      
+      const segments: PathSegment[] = pathSegments.map((segment, index) => {
+        const type = detectParamType(segment);
+        
+        // 동적 파라미터로 판단하는 조건
+        const isDynamic = 
+          type === 'uuid' || 
+          (type === 'number' && segment.length > 2) || 
+          (type === 'string' && segment.length > 20) ||
+          /^[a-f0-9]{24}$/i.test(segment); // MongoDB ObjectId 패턴
+        
+        const paramName = isDynamic ? generateParamName(segment, index, pathSegments) : undefined;
+        
+        // 파라미터 이름 제안
+        const suggestions = isDynamic ? [
+          paramName!,
+          `${paramName}${index}`,
+          `param${index + 1}`,
+          type === 'number' ? 'id' : type === 'uuid' ? 'uuid' : 'value'
+        ].filter((item, index, arr) => arr.indexOf(item) === index) : undefined;
+
+        return {
+          value: segment,
+          isDynamic,
+          paramName,
+          paramType: isDynamic ? type : undefined,
+          suggestions
+        };
+      });
+
+      // 신뢰도 계산 (동적 파라미터가 많을수록 높음)
+      const dynamicCount = segments.filter(s => s.isDynamic).length;
+      const confidence = Math.min(dynamicCount / Math.max(segments.length, 1) * 100, 95);
+
+      // 템플릿 생성
+      const suggestedTemplate = '/' + segments.map(segment => 
+        segment.isDynamic ? `:${segment.paramName}` : segment.value
+      ).join('/');
+
+      return {
+        segments,
+        confidence,
+        suggestedTemplate
+      };
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const validateTemplateMatch = (url: string, template: string): 'success' | 'warning' | 'error' => {
+    if (!url || !template) return 'warning';
+    
+    try {
+      const urlObj = new URL(url);
+      const urlSegments = urlObj.pathname.split('/').filter(s => s);
+      const templateSegments = template.split('/').filter(s => s);
+      
+      if (urlSegments.length !== templateSegments.length) {
+        return 'error';
+      }
+      
+      let dynamicCount = 0;
+      let matchCount = 0;
+      
+      for (let i = 0; i < templateSegments.length; i++) {
+        const templateSegment = templateSegments[i];
+        const urlSegment = urlSegments[i];
+        
+        if (templateSegment.startsWith(':') || (templateSegment.startsWith('{') && templateSegment.endsWith('}'))) {
+          dynamicCount++;
+          matchCount++;
+        } else if (templateSegment === urlSegment) {
+          matchCount++;
+        }
+      }
+      
+      if (matchCount === templateSegments.length) {
+        return dynamicCount > 0 ? 'success' : 'warning';
+      }
+      
+      return 'error';
+    } catch (error) {
+      return 'error';
+    }
+  };
+
+  // URL 입력 시 실시간 템플릿 분석
+  useEffect(() => {
+    if (mode === 'parse' && inputUrl.trim()) {
+      const analysis = analyzeUrlForTemplate(inputUrl);
+      setTemplateAnalysis(analysis);
+      if (analysis && analysis.confidence > 30 && !pathTemplate) {
+        setShowTemplateSuggestions(true);
+      }
+    } else {
+      setTemplateAnalysis(null);
+      setShowTemplateSuggestions(false);
+    }
+  }, [inputUrl, mode, pathTemplate]);
+
+  // 실시간 파싱 및 템플릿 매칭 검증
+  useEffect(() => {
+    if (mode === 'parse' && inputUrl.trim()) {
+      // 실시간 파싱
+      const parsed = parseUrl(inputUrl, pathTemplate || undefined);
+      setRealtimeParsedResult(parsed);
+      
+      // 템플릿 매칭 검증
+      if (pathTemplate.trim()) {
+        const matchStatus = validateTemplateMatch(inputUrl, pathTemplate);
+        setTemplateMatchStatus(matchStatus);
+      } else {
+        setTemplateMatchStatus(null);
+      }
+    } else {
+      setRealtimeParsedResult(null);
+      setTemplateMatchStatus(null);
+    }
+  }, [inputUrl, pathTemplate, mode]);
 
   const parseUrl = (urlString: string, template?: string): ParsedUrl | null => {
     try {
@@ -287,6 +489,15 @@ const HttpParserPage: React.FC = () => {
     }
   };
 
+  const applyTemplateSuggestion = (suggestion: string) => {
+    setPathTemplate(suggestion);
+    setShowTemplateSuggestions(false);
+  };
+
+  const dismissTemplateSuggestions = () => {
+    setShowTemplateSuggestions(false);
+  };
+
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -365,18 +576,24 @@ const HttpParserPage: React.FC = () => {
     }
   };
 
-  const renderParsedResult = () => {
-    if (!parsedResult) return null;
+  const renderParsedResult = (result?: ParsedUrl | null) => {
+    const resultToShow = result || parsedResult;
+    if (!resultToShow) return null;
+
+    const isRealtime = result === realtimeParsedResult;
 
     return (
       <Card
         title={
           <Space>
             <Text strong>파싱 결과</Text>
+            {isRealtime && (
+              <Tag color="blue">실시간</Tag>
+            )}
             <Button
               size="small"
               icon={<CopyOutlined />}
-              onClick={() => handleCopy(JSON.stringify(parsedResult, null, 2))}
+              onClick={() => handleCopy(JSON.stringify(resultToShow, null, 2))}
               title="결과 복사"
             />
             <Button
@@ -390,23 +607,71 @@ const HttpParserPage: React.FC = () => {
         style={{ marginTop: 16 }}
       >
         <Descriptions column={1} bordered size="small">
-          <Descriptions.Item label="프로토콜">{parsedResult.protocol}</Descriptions.Item>
-          <Descriptions.Item label="호스트">{parsedResult.host}</Descriptions.Item>
-          <Descriptions.Item label="경로">{parsedResult.pathname}</Descriptions.Item>
-          {parsedResult.search && (
-            <Descriptions.Item label="쿼리 스트링">{parsedResult.search}</Descriptions.Item>
+          <Descriptions.Item label="프로토콜">
+            <Text code>{resultToShow.protocol}</Text>
+          </Descriptions.Item>
+          <Descriptions.Item label="호스트">
+            <Text code>{resultToShow.host}</Text>
+          </Descriptions.Item>
+          <Descriptions.Item label="경로">
+            <Text code>{resultToShow.pathname}</Text>
+          </Descriptions.Item>
+          {resultToShow.search && (
+            <Descriptions.Item label="쿼리 스트링">
+              <Text code>{resultToShow.search}</Text>
+            </Descriptions.Item>
           )}
-          {parsedResult.hash && (
-            <Descriptions.Item label="해시">{parsedResult.hash}</Descriptions.Item>
+          {resultToShow.hash && (
+            <Descriptions.Item label="해시">
+              <Text code>{resultToShow.hash}</Text>
+            </Descriptions.Item>
           )}
         </Descriptions>
 
-        {Object.keys(parsedResult.pathParams).length > 0 && (
+        {Object.keys(resultToShow.pathParams).length > 0 && (
           <>
-            <Divider orientation="left" plain>경로 파라미터</Divider>
+            <Divider orientation="left" plain>
+              <Text strong>경로 파라미터 ({Object.keys(resultToShow.pathParams).length}개)</Text>
+            </Divider>
             <Space wrap>
-              {Object.entries(parsedResult.pathParams).map(([key, value]) => (
-                <Tag key={key} color="blue">
+              {Object.entries(resultToShow.pathParams).map(([key, value]) => {
+                const type = detectParamType(value);
+                const color = type === 'uuid' ? 'purple' : type === 'number' ? 'blue' : 'cyan';
+                return (
+                  <Popover
+                    key={key}
+                    content={
+                      <div>
+                        <Text strong>파라미터 정보</Text>
+                        <br />
+                        <Text>이름: {key}</Text>
+                        <br />
+                        <Text>값: {value}</Text>
+                        <br />
+                        <Text>타입: {type}</Text>
+                      </div>
+                    }
+                    title="파라미터 세부 정보"
+                  >
+                    <Tag color={color} style={{ cursor: 'pointer' }}>
+                      <strong>{key}</strong>: {value}
+                      <span style={{ marginLeft: 4, opacity: 0.7 }}>({type})</span>
+                    </Tag>
+                  </Popover>
+                );
+              })}
+            </Space>
+          </>
+        )}
+
+        {Object.keys(resultToShow.queryParams).length > 0 && (
+          <>
+            <Divider orientation="left" plain>
+              <Text strong>쿼리 파라미터 ({Object.keys(resultToShow.queryParams).length}개)</Text>
+            </Divider>
+            <Space wrap>
+              {Object.entries(resultToShow.queryParams).map(([key, value]) => (
+                <Tag key={key} color="green">
                   <strong>{key}</strong>: {value}
                 </Tag>
               ))}
@@ -414,17 +679,11 @@ const HttpParserPage: React.FC = () => {
           </>
         )}
 
-        {Object.keys(parsedResult.queryParams).length > 0 && (
-          <>
-            <Divider orientation="left" plain>쿼리 파라미터</Divider>
-            <Space wrap>
-              {Object.entries(parsedResult.queryParams).map(([key, value]) => (
-                <Tag key={key} color="green">
-                  <strong>{key}</strong>: {value}
-                </Tag>
-              ))}
-            </Space>
-          </>
+        {Object.keys(resultToShow.pathParams).length === 0 && Object.keys(resultToShow.queryParams).length === 0 && pathTemplate && (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+            <InfoCircleOutlined style={{ fontSize: '16px', marginRight: '8px' }} />
+            템플릿과 매칭되는 파라미터가 없습니다
+          </div>
         )}
       </Card>
     );
@@ -525,6 +784,19 @@ const HttpParserPage: React.FC = () => {
                     
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 템플릿 (선택사항)</Text>
+                      {templateAnalysis && templateAnalysis.confidence > 30 && (
+                        <Tooltip title={`신뢰도: ${templateAnalysis.confidence.toFixed(0)}%`}>
+                          <Button
+                            size="small"
+                            icon={<BulbOutlined />}
+                            onClick={() => setShowTemplateSuggestions(!showTemplateSuggestions)}
+                            style={{ marginLeft: 8 }}
+                            type={showTemplateSuggestions ? "primary" : "default"}
+                          >
+                            자동 감지
+                          </Button>
+                        </Tooltip>
+                      )}
                       <Button
                         size="small"
                         icon={<ExpandOutlined />}
@@ -533,10 +805,61 @@ const HttpParserPage: React.FC = () => {
                         title="전체 화면으로 편집"
                       />
                     </div>
+                    
+                    {showTemplateSuggestions && templateAnalysis && (
+                      <div style={{ marginBottom: 12, padding: '12px', backgroundColor: '#f0f9ff', border: '1px solid #bae7ff', borderRadius: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                          <InfoCircleOutlined style={{ color: '#1890ff', marginRight: 4 }} />
+                          <Text strong style={{ color: '#1890ff' }}>템플릿 제안 (신뢰도: {templateAnalysis.confidence.toFixed(0)}%)</Text>
+                          <Button 
+                            type="text" 
+                            size="small" 
+                            onClick={dismissTemplateSuggestions}
+                            style={{ marginLeft: 'auto' }}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            onClick={() => applyTemplateSuggestion(templateAnalysis.suggestedTemplate)}
+                            style={{ marginRight: 8 }}
+                          >
+                            {templateAnalysis.suggestedTemplate} 적용
+                          </Button>
+                        </div>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            동적 세그먼트: {templateAnalysis.segments.filter(s => s.isDynamic).map(s => 
+                              `${s.value} (${s.paramType})`
+                            ).join(', ')}
+                          </Text>
+                        </div>
+                      </div>
+                    )}
+                    
                     <Input
                       value={pathTemplate}
                       onChange={(e) => setPathTemplate(e.target.value)}
                       placeholder="/users/:userId/posts 또는 /users/{userId}/posts"
+                      status={templateMatchStatus === 'error' ? 'error' : templateMatchStatus === 'warning' ? 'warning' : undefined}
+                      suffix={templateMatchStatus && (
+                        <Tooltip title={
+                          templateMatchStatus === 'success' ? '템플릿이 URL과 일치합니다' :
+                          templateMatchStatus === 'warning' ? '템플릿이 부분적으로 일치합니다' :
+                          '템플릿이 URL과 일치하지 않습니다'
+                        }>
+                          {templateMatchStatus === 'success' ? (
+                            <CheckOutlined style={{ color: '#52c41a' }} />
+                          ) : templateMatchStatus === 'warning' ? (
+                            <InfoCircleOutlined style={{ color: '#faad14' }} />
+                          ) : (
+                            <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                          )}
+                        </Tooltip>
+                      )}
                     />
                   </div>
                 </Card>
@@ -544,7 +867,24 @@ const HttpParserPage: React.FC = () => {
               
               <Col span={12}>
                 <div style={{ height: '300px', overflow: 'auto' }}>
-                  {renderParsedResult()}
+                  {(realtimeParsedResult || parsedResult) && renderParsedResult(realtimeParsedResult || parsedResult)}
+                  {!realtimeParsedResult && !parsedResult && inputUrl.trim() && (
+                    <Card title="파싱 결과" style={{ height: '100%' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        height: '200px',
+                        color: '#999',
+                        textAlign: 'center'
+                      }}>
+                        <div>
+                          <InfoCircleOutlined style={{ fontSize: '24px', marginBottom: '8px', display: 'block' }} />
+                          올바른 URL을 입력하면 파싱 결과가 표시됩니다
+                        </div>
+                      </div>
+                    </Card>
+                  )}
                 </div>
               </Col>
             </Row>
