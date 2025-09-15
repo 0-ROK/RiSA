@@ -232,10 +232,13 @@ const HttpParserPage: React.FC = () => {
         segment.isDynamic ? `:${segment.paramName}` : segment.value
       ).join('/');
 
-      // 쿼리 템플릿 생성
-      const suggestedQueryTemplate = queryParams.map(param =>
-        param.isDynamic ? `${param.key}=:${param.key}` : `${param.key}=${param.value}`
-      ).join('&');
+      // 쿼리 템플릿 생성 - 키 배열 형식
+      const dynamicQueryKeys = queryParams
+        .filter(param => param.isDynamic)
+        .map(param => param.key);
+      const suggestedQueryTemplate = dynamicQueryKeys.length > 0
+        ? JSON.stringify(dynamicQueryKeys)
+        : '';
 
       return {
         segments,
@@ -350,33 +353,56 @@ const HttpParserPage: React.FC = () => {
 
       // Query template parsing
       if (queryTemplate) {
-        const templatePairs = queryTemplate.split('&').filter(pair => pair);
-        const urlParams = new URLSearchParams(url.search);
-
-        templatePairs.forEach(templatePair => {
-          const [key, value] = templatePair.split('=');
-          if (key && value) {
-            if (value.startsWith(':')) {
-              const paramName = value.substring(1);
+        try {
+          // Try to parse as JSON array first (new format)
+          const queryKeys = JSON.parse(queryTemplate);
+          if (Array.isArray(queryKeys)) {
+            // Array format: ["page", "limit"]
+            const urlParams = new URLSearchParams(url.search);
+            queryKeys.forEach(key => {
               const urlValue = urlParams.get(key);
               if (urlValue !== null) {
-                queryParams[paramName] = urlValue;
-              }
-            } else if (value.startsWith('{') && value.endsWith('}')) {
-              const paramName = value.slice(1, -1);
-              const urlValue = urlParams.get(key);
-              if (urlValue !== null) {
-                queryParams[paramName] = urlValue;
-              }
-            } else {
-              // Static value - include if matches
-              const urlValue = urlParams.get(key);
-              if (urlValue === value) {
                 queryParams[key] = urlValue;
               }
-            }
+            });
+          } else {
+            // Fallback to old format parsing for compatibility
+            parseOldQueryTemplate();
           }
-        });
+        } catch {
+          // If JSON parsing fails, try old format for compatibility
+          parseOldQueryTemplate();
+        }
+
+        function parseOldQueryTemplate() {
+          const templatePairs = queryTemplate?.split('&').filter(pair => pair) || [];
+          const urlParams = new URLSearchParams(url.search);
+
+          templatePairs.forEach(templatePair => {
+            const [key, value] = templatePair.split('=');
+            if (key && value) {
+              if (value.startsWith(':')) {
+                const paramName = value.substring(1);
+                const urlValue = urlParams.get(key);
+                if (urlValue !== null) {
+                  queryParams[paramName] = urlValue;
+                }
+              } else if (value.startsWith('{') && value.endsWith('}')) {
+                const paramName = value.slice(1, -1);
+                const urlValue = urlParams.get(key);
+                if (urlValue !== null) {
+                  queryParams[paramName] = urlValue;
+                }
+              } else {
+                // Static value - include if matches
+                const urlValue = urlParams.get(key);
+                if (urlValue === value) {
+                  queryParams[key] = urlValue;
+                }
+              }
+            }
+          });
+        }
       } else {
         // No query template - include all query parameters
         url.searchParams.forEach((value, key) => {
@@ -428,33 +454,56 @@ const HttpParserPage: React.FC = () => {
       let queryString = '';
 
       if (template.queryTemplate) {
-        // Use query template
-        const templatePairs = template.queryTemplate.split('&').filter(pair => pair);
-        const queryParts: string[] = [];
-
-        templatePairs.forEach(templatePair => {
-          const [key, value] = templatePair.split('=');
-          if (key && value) {
-            if (value.startsWith(':')) {
-              const paramName = value.substring(1);
-              const paramValue = template.queryParams[paramName];
+        try {
+          // Try to parse as JSON array first (new format)
+          const queryKeys = JSON.parse(template.queryTemplate);
+          if (Array.isArray(queryKeys)) {
+            // Array format: ["page", "limit"]
+            const queryParts: string[] = [];
+            queryKeys.forEach(key => {
+              const paramValue = template.queryParams[key];
               if (paramValue && paramValue.trim() !== '') {
                 queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
               }
-            } else if (value.startsWith('{') && value.endsWith('}')) {
-              const paramName = value.slice(1, -1);
-              const paramValue = template.queryParams[paramName];
-              if (paramValue && paramValue.trim() !== '') {
-                queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
-              }
-            } else {
-              // Static value
-              queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
-            }
+            });
+            queryString = queryParts.join('&');
+          } else {
+            // Fallback to old format for compatibility
+            buildOldQueryTemplate();
           }
-        });
+        } catch {
+          // If JSON parsing fails, try old format for compatibility
+          buildOldQueryTemplate();
+        }
 
-        queryString = queryParts.join('&');
+        function buildOldQueryTemplate() {
+          const templatePairs = template.queryTemplate.split('&').filter(pair => pair);
+          const queryParts: string[] = [];
+
+          templatePairs.forEach(templatePair => {
+            const [key, value] = templatePair.split('=');
+            if (key && value) {
+              if (value.startsWith(':')) {
+                const paramName = value.substring(1);
+                const paramValue = template.queryParams[paramName];
+                if (paramValue && paramValue.trim() !== '') {
+                  queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
+                }
+              } else if (value.startsWith('{') && value.endsWith('}')) {
+                const paramName = value.slice(1, -1);
+                const paramValue = template.queryParams[paramName];
+                if (paramValue && paramValue.trim() !== '') {
+                  queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
+                }
+              } else {
+                // Static value
+                queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+              }
+            }
+          });
+
+          queryString = queryParts.join('&');
+        }
       } else {
         // No query template - use all query parameters
         const queryEntries = Object.entries(template.queryParams).filter(([_, value]) => value.trim() !== '');
@@ -1136,7 +1185,7 @@ const HttpParserPage: React.FC = () => {
                     <Input
                       value={queryTemplate}
                       onChange={(e) => setQueryTemplate(e.target.value)}
-                      placeholder="page=:page&limit=:limit 또는 page={page}&limit={limit}"
+                      placeholder='["page", "limit"]'
                     />
                   </div>
                 </Card>
@@ -1226,7 +1275,7 @@ const HttpParserPage: React.FC = () => {
                     <Input
                       value={buildQueryTemplate}
                       onChange={(e) => setBuildQueryTemplate(e.target.value)}
-                      placeholder="page=:page&limit=:limit"
+                      placeholder='["page", "limit"]'
                       style={{ marginBottom: 16 }}
                     />
 
