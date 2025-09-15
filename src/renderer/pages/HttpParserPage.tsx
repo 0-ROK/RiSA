@@ -295,7 +295,7 @@ const HttpParserPage: React.FC = () => {
     if (mode === 'parse' && inputUrl.trim()) {
       const analysis = analyzeUrlForTemplate(inputUrl);
       setTemplateAnalysis(analysis);
-      if (analysis && (analysis.dynamicCount > 0 || analysis.dynamicQueryCount > 0) && (!pathTemplate && !queryTemplate)) {
+      if (analysis && (analysis.segments.length > 0 || analysis.dynamicQueryCount > 0) && (!pathTemplate && !queryTemplate)) {
         setShowTemplateSuggestions(true);
       }
     } else {
@@ -1040,8 +1040,8 @@ const HttpParserPage: React.FC = () => {
 
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 템플릿 (선택사항)</Text>
-                      {templateAnalysis && (templateAnalysis.dynamicCount > 0 || templateAnalysis.dynamicQueryCount > 0) && (
-                        <Tooltip title={`${templateAnalysis.dynamicCount}개의 동적 경로 파라미터, ${templateAnalysis.dynamicQueryCount}개의 동적 쿼리 파라미터 감지됨`}>
+                      {templateAnalysis && (templateAnalysis.segments.length > 0 || templateAnalysis.dynamicQueryCount > 0) && (
+                        <Tooltip title={`경로: ${templateAnalysis.segments.length}개 세그먼트 (동적 ${templateAnalysis.dynamicCount}개), 쿼리: ${templateAnalysis.dynamicQueryCount}개 파라미터`}>
                           <Button
                             size="small"
                             icon={<BulbOutlined />}
@@ -1079,7 +1079,7 @@ const HttpParserPage: React.FC = () => {
                           </Button>
                         </div>
 
-                        {templateAnalysis.dynamicCount > 0 && (
+                        {templateAnalysis.segments.length > 0 && (
                           <>
                             <div style={{ marginBottom: 4 }}>
                               <Text strong style={{ fontSize: '12px' }}>경로 템플릿:</Text>
