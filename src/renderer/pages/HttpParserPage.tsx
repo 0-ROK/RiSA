@@ -619,59 +619,44 @@ const HttpParserPage: React.FC = () => {
     }
   };
 
-  const performParse = async () => {
-    if (!inputUrl.trim()) {
-      message.error('파싱할 URL을 입력해주세요.');
-      return;
-    }
-
+  // Parse full URL and extract components for Build mode
+  const parseUrlForBuild = (fullUrl: string): { baseUrl: string; pathTemplate: string; queryTemplate: string; success: boolean; message: string } => {
     try {
-      const result = parseUrl(inputUrl, pathTemplate || undefined, queryTemplate || undefined);
-      if (!result) {
-        throw new Error('올바른 URL 형식이 아닙니다.');
+      const url = new URL(fullUrl);
+      const baseUrl = `${url.protocol}//${url.host}`;
+
+      // Analyze path for template generation (reuse existing logic)
+      const analysis = analyzeUrlForTemplate(fullUrl);
+
+      const pathTemplate = analysis?.suggestedTemplate || url.pathname;
+      const queryTemplate = analysis?.suggestedQueryTemplate || '';
+
+      let extractedParts = [];
+      extractedParts.push(`베이스 URL: ${baseUrl}`);
+      if (pathTemplate && pathTemplate !== '/') {
+        extractedParts.push(`경로 템플릿: ${pathTemplate}`);
+      }
+      if (queryTemplate) {
+        extractedParts.push(`쿼리 템플릿: ${queryTemplate}`);
       }
 
-      setParsedResult(result);
-      message.success('URL 파싱이 완료되었습니다.');
+      const message = `URL에서 추출됨: ${extractedParts.join(', ')}`;
 
-      // Save to history
-      const templateInfo = [];
-      if (pathTemplate) templateInfo.push(`경로 템플릿: ${pathTemplate}`);
-      if (queryTemplate) templateInfo.push(`쿼리 템플릿: ${queryTemplate}`);
-
-      const historyItem: HistoryItem = {
-        id: crypto.randomUUID(),
-        type: 'http-parse' as any,
-        inputText: inputUrl + (templateInfo.length > 0 ? `\n${templateInfo.join('\n')}` : ''),
-        outputText: JSON.stringify(result, null, 2),
+      return {
+        baseUrl,
+        pathTemplate,
+        queryTemplate,
         success: true,
-        timestamp: new Date(),
+        message
       };
-
-      await saveHistoryItem(historyItem);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-
-      notification.error({
-        message: 'URL 파싱 실패',
-        description: errorMessage,
-        icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-        placement: 'topRight',
-        duration: 5,
-      });
-
-      // Save failed operation
-      const failedHistoryItem: HistoryItem = {
-        id: crypto.randomUUID(),
-        type: 'http-parse' as any,
-        inputText: inputUrl,
-        outputText: '',
+      return {
+        baseUrl: fullUrl,
+        pathTemplate: '',
+        queryTemplate: '',
         success: false,
-        errorMessage,
-        timestamp: new Date(),
+        message: '올바른 URL 형식이 아닙니다.'
       };
-
-      await saveHistoryItem(failedHistoryItem);
     }
   };
 
@@ -1567,8 +1552,34 @@ const HttpParserPage: React.FC = () => {
                     </div>
                     <Input
                       value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                      placeholder="https://api.example.com"
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setBaseUrl(newValue);
+
+                        // Auto-detect full URL and extract components
+                        if (newValue.includes('?') || (newValue.split('/').length > 3 && newValue.startsWith('http'))) {
+                          const extraction = parseUrlForBuild(newValue);
+                          if (extraction.success && (extraction.pathTemplate !== '/' || extraction.queryTemplate)) {
+                            // Only auto-extract if there's actually something to extract
+                            setBaseUrl(extraction.baseUrl);
+                            if (extraction.pathTemplate && extraction.pathTemplate !== '/') {
+                              setBuildPathTemplate(extraction.pathTemplate);
+                            }
+                            if (extraction.queryTemplate) {
+                              setBuildQueryTemplate(extraction.queryTemplate);
+                            }
+
+                            // Show success notification
+                            notification.success({
+                              message: 'URL 자동 분석 완료',
+                              description: extraction.message,
+                              placement: 'topRight',
+                              duration: 3,
+                            });
+                          }
+                        }
+                      }}
+                      placeholder="https://api.example.com 또는 전체 URL을 붙여넣으면 자동으로 분석됩니다"
                       style={{ marginBottom: 16 }}
                     />
 
