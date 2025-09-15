@@ -119,6 +119,10 @@ const HttpParserPage: React.FC = () => {
   // Template management states
   const [showTemplatesList, setShowTemplatesList] = useState(false);
 
+  // JSON validation states
+  const [pathParamsError, setPathParamsError] = useState<string | null>(null);
+  const [queryParamsError, setQueryParamsError] = useState<string | null>(null);
+
   // 자동 템플릿 분석 함수들
   const detectParamType = (value: string): 'number' | 'uuid' | 'string' => {
     // UUID 패턴 검사
@@ -338,6 +342,18 @@ const HttpParserPage: React.FC = () => {
       setTemplateMatchStatus(null);
     }
   }, [inputUrl, pathTemplate, queryTemplate, mode]);
+
+  // Real-time validation for path parameters JSON
+  useEffect(() => {
+    const error = validateJsonParams(pathParamsInput);
+    setPathParamsError(error);
+  }, [pathParamsInput]);
+
+  // Real-time validation for query parameters JSON
+  useEffect(() => {
+    const error = validateJsonParams(queryParamsInput);
+    setQueryParamsError(error);
+  }, [queryParamsInput]);
 
   const parseUrl = (urlString: string, pathTemplate?: string, queryTemplate?: string): ParsedUrl | null => {
     try {
@@ -588,6 +604,18 @@ const HttpParserPage: React.FC = () => {
         // If both approaches fail, provide helpful error message
         throw new Error('올바른 JSON 형식이 아닙니다. 예시: {"key": "value"} 또는 {key: "value"} 또는 {key: 123}');
       }
+    }
+  };
+
+  // Validate JSON parameters and return error message if invalid
+  const validateJsonParams = (input: string): string | null => {
+    if (!input.trim()) return null; // Empty input is valid
+
+    try {
+      parseJsonParams(input);
+      return null; // Valid JSON
+    } catch (error) {
+      return error instanceof Error ? error.message : '올바른 JSON 형식이 아닙니다.';
     }
   };
 
@@ -1130,14 +1158,22 @@ const HttpParserPage: React.FC = () => {
             <Col style={{ marginLeft: 'auto' }}>
               <Space>
                 {mode === 'build' && (
-                  <Button
-                    type="primary"
-                    icon={<EditOutlined />}
-                    onClick={performBuild}
-                    title="URL 생성 (Cmd/Ctrl+Enter)"
+                  <Tooltip
+                    title={
+                      (pathParamsError || queryParamsError)
+                        ? 'JSON 형식 오류를 수정해주세요'
+                        : 'URL 생성 (Cmd/Ctrl+Enter)'
+                    }
                   >
-                    생성
-                  </Button>
+                    <Button
+                      type="primary"
+                      icon={<EditOutlined />}
+                      onClick={performBuild}
+                      disabled={pathParamsError !== null || queryParamsError !== null}
+                    >
+                      생성
+                    </Button>
+                  </Tooltip>
                 )}
                 <Button
                   icon={<SaveOutlined />}
@@ -1584,10 +1620,24 @@ const HttpParserPage: React.FC = () => {
                       value={pathParamsInput}
                       onChange={(e) => setPathParamsInput(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder='{"userId": "123"}'
-                      style={{ marginBottom: 16, fontFamily: 'monospace' }}
+                      placeholder='{"userId": "123"} 또는 {userId: "123"} 또는 {userId: 123}'
+                      style={{
+                        marginBottom: pathParamsError ? 8 : 16,
+                        fontFamily: 'monospace'
+                      }}
+                      status={pathParamsError ? 'error' : undefined}
                       rows={3}
                     />
+                    {pathParamsError && (
+                      <div style={{
+                        marginBottom: 16,
+                        color: '#ff4d4f',
+                        fontSize: '12px',
+                        paddingLeft: '12px'
+                      }}>
+                        {pathParamsError}
+                      </div>
+                    )}
 
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>쿼리 파라미터 (JSON)</Text>
@@ -1596,10 +1646,24 @@ const HttpParserPage: React.FC = () => {
                       value={queryParamsInput}
                       onChange={(e) => setQueryParamsInput(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder='{"page": "1", "limit": "10"}'
-                      style={{ fontFamily: 'monospace' }}
+                      placeholder='{"page": "1", "limit": "10"} 또는 {page: 1, limit: 10}'
+                      style={{
+                        marginBottom: queryParamsError ? 8 : 0,
+                        fontFamily: 'monospace'
+                      }}
+                      status={queryParamsError ? 'error' : undefined}
                       rows={3}
                     />
+                    {queryParamsError && (
+                      <div style={{
+                        marginTop: 8,
+                        color: '#ff4d4f',
+                        fontSize: '12px',
+                        paddingLeft: '12px'
+                      }}>
+                        {queryParamsError}
+                      </div>
+                    )}
                   </div>
                 </Card>
               </Col>
