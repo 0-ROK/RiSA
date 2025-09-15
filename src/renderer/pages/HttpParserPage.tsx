@@ -1135,9 +1135,7 @@ const HttpParserPage: React.FC = () => {
                             size="small"
                             type="primary"
                             onClick={() => {
-                              if (templateAnalysis.dynamicCount > 0) {
-                                applyTemplateSuggestion(templateAnalysis.suggestedTemplate, 'path');
-                              }
+                              applyTemplateSuggestion(templateAnalysis.suggestedTemplate, 'path');
                               if (templateAnalysis.dynamicQueryCount > 0) {
                                 applyTemplateSuggestion(templateAnalysis.suggestedQueryTemplate, 'query');
                               }
@@ -1169,8 +1167,15 @@ const HttpParserPage: React.FC = () => {
                           )}
                         </Tooltip>
                       )}
-                      style={{ marginBottom: 16 }}
+                      style={{ marginBottom: 8 }}
                     />
+
+                    <div style={{ marginBottom: 16, padding: '8px 12px', backgroundColor: '#f6f8fa', border: '1px solid #e1e4e8', borderRadius: '6px', fontSize: '12px', color: '#586069' }}>
+                      <InfoCircleOutlined style={{ marginRight: '6px', color: '#0969da' }} />
+                      <strong>동적 파라미터 표기법:</strong> <Text code>:paramName</Text> 또는 <Text code>{'{paramName}'}</Text> 형식으로 입력하세요.
+                      <br />
+                      예시: <Text code>/users/:userId/posts</Text> 또는 <Text code>/users/{'{userId}'}/posts</Text>
+                    </div>
 
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>쿼리 템플릿 (선택사항)</Text>
@@ -1259,8 +1264,15 @@ const HttpParserPage: React.FC = () => {
                       value={buildPathTemplate}
                       onChange={(e) => setBuildPathTemplate(e.target.value)}
                       placeholder="/users/:userId/posts"
-                      style={{ marginBottom: 16 }}
+                      style={{ marginBottom: 8 }}
                     />
+
+                    <div style={{ marginBottom: 16, padding: '8px 12px', backgroundColor: '#f6f8fa', border: '1px solid #e1e4e8', borderRadius: '6px', fontSize: '12px', color: '#586069' }}>
+                      <InfoCircleOutlined style={{ marginRight: '6px', color: '#0969da' }} />
+                      <strong>동적 파라미터 표기법:</strong> <Text code>:paramName</Text> 또는 <Text code>{'{paramName}'}</Text> 형식으로 입력하세요.
+                      <br />
+                      예시: <Text code>/users/:userId/posts</Text> 또는 <Text code>/users/{'{userId}'}/posts</Text>
+                    </div>
 
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>쿼리 템플릿</Text>
