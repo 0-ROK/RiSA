@@ -95,7 +95,7 @@ const HttpParserPage: React.FC = () => {
   const [pathParamsInput, setPathParamsInput] = useState('');
   const [queryParamsInput, setQueryParamsInput] = useState('');
   const [builtUrl, setBuiltUrl] = useState('');
-  
+
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [fullScreenType, setFullScreenType] = useState<'input' | 'output' | 'template' | 'queryTemplate'>('input');
   const [fullScreenContent, setFullScreenContent] = useState('');
@@ -111,19 +111,19 @@ const HttpParserPage: React.FC = () => {
     if (uuidRegex.test(value)) {
       return 'uuid';
     }
-    
+
     // 숫자 패턴 검사
     if (/^\d+$/.test(value) && value.length > 0) {
       return 'number';
     }
-    
+
     return 'string';
   };
 
   const generateParamName = (value: string, index: number, pathSegments: string[]): string => {
     const type = detectParamType(value);
     const prevSegment = index > 0 ? pathSegments[index - 1] : '';
-    
+
     // 이전 세그먼트에 따른 파라미터 이름 추론
     if (prevSegment) {
       const singularMap: Record<string, string> = {
@@ -138,17 +138,17 @@ const HttpParserPage: React.FC = () => {
         'tasks': 'taskId',
         'teams': 'teamId'
       };
-      
+
       if (singularMap[prevSegment.toLowerCase()]) {
         return singularMap[prevSegment.toLowerCase()];
       }
-      
+
       // 복수형을 단수형으로 변환하고 Id 추가
       if (prevSegment.endsWith('s')) {
         return `${prevSegment.slice(0, -1)}Id`;
       }
     }
-    
+
     // 타입에 따른 기본 이름
     switch (type) {
       case 'uuid':
@@ -209,23 +209,17 @@ const HttpParserPage: React.FC = () => {
         };
       });
 
-      // 쿼리 파라미터 분석
+      // 쿼리 파라미터 분석 - 모든 쿼리 파라미터를 동적으로 처리
       const queryParams: QueryParam[] = [];
       url.searchParams.forEach((value, key) => {
         const type = detectQueryParamType(value);
 
-        // 동적 쿼리 파라미터로 판단하는 조건
-        const isDynamic =
-          type === 'uuid' ||
-          (type === 'number' && value.length > 2 && parseInt(value) > 1000) ||
-          (type === 'string' && value.length > 15) ||
-          /^[a-f0-9]{24}$/i.test(value); // MongoDB ObjectId 패턴
-
+        // 모든 쿼리 파라미터는 동적으로 처리
         queryParams.push({
           key,
           value,
-          isDynamic,
-          paramType: isDynamic ? type : undefined
+          isDynamic: true,
+          paramType: type
         });
       });
 
@@ -258,23 +252,23 @@ const HttpParserPage: React.FC = () => {
 
   const validateTemplateMatch = (url: string, template: string): 'success' | 'warning' | 'error' => {
     if (!url || !template) return 'warning';
-    
+
     try {
       const urlObj = new URL(url);
       const urlSegments = urlObj.pathname.split('/').filter(s => s);
       const templateSegments = template.split('/').filter(s => s);
-      
+
       if (urlSegments.length !== templateSegments.length) {
         return 'error';
       }
-      
+
       let dynamicCount = 0;
       let matchCount = 0;
-      
+
       for (let i = 0; i < templateSegments.length; i++) {
         const templateSegment = templateSegments[i];
         const urlSegment = urlSegments[i];
-        
+
         if (templateSegment.startsWith(':') || (templateSegment.startsWith('{') && templateSegment.endsWith('}'))) {
           dynamicCount++;
           matchCount++;
@@ -282,11 +276,11 @@ const HttpParserPage: React.FC = () => {
           matchCount++;
         }
       }
-      
+
       if (matchCount === templateSegments.length) {
         return dynamicCount > 0 ? 'success' : 'warning';
       }
-      
+
       return 'error';
     } catch (error) {
       return 'error';
@@ -532,7 +526,7 @@ const HttpParserPage: React.FC = () => {
       await saveHistoryItem(historyItem);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-      
+
       notification.error({
         message: 'URL 파싱 실패',
         description: errorMessage,
@@ -598,7 +592,7 @@ const HttpParserPage: React.FC = () => {
       await saveHistoryItem(historyItem);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-      
+
       notification.error({
         message: 'URL 생성 실패',
         description: errorMessage,
@@ -725,10 +719,9 @@ const HttpParserPage: React.FC = () => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       e.stopPropagation();
-      
-      if (mode === 'parse') {
-        performParse();
-      } else {
+
+      // Parse 모드에서는 실시간 파싱이 이미 되고 있으므로 키보드 단축키 비활성화
+      if (mode === 'build') {
         performBuild();
       }
     }
@@ -901,11 +894,11 @@ const HttpParserPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <PageHeader 
+      <PageHeader
         title="HTTP Parser"
         icon={<LinkOutlined />}
       />
-      
+
       <div style={{ padding: '24px', maxWidth: 1200, margin: '0 auto', width: '100%', flex: 1 }}>
         <Card style={{ marginBottom: 16 }}>
           <Space direction="vertical" style={{ width: '100%' }}>
@@ -943,14 +936,16 @@ const HttpParserPage: React.FC = () => {
             </Col>
             <Col style={{ marginLeft: 'auto' }}>
               <Space>
-                <Button
-                  type="primary"
-                  icon={mode === 'parse' ? <LinkOutlined /> : <EditOutlined />}
-                  onClick={mode === 'parse' ? performParse : performBuild}
-                  title={`${mode === 'parse' ? 'URL 파싱' : 'URL 생성'} (Cmd/Ctrl+Enter)`}
-                >
-                  {mode === 'parse' ? '파싱' : '생성'}
-                </Button>
+                {mode === 'build' && (
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={performBuild}
+                    title="URL 생성 (Cmd/Ctrl+Enter)"
+                  >
+                    생성
+                  </Button>
+                )}
                 <Button
                   icon={<ClearOutlined />}
                   onClick={handleClear}
@@ -970,7 +965,7 @@ const HttpParserPage: React.FC = () => {
               <Col span={12}>
                 <Card
                   title="URL 입력"
-                  style={{ height: '500px', display: 'flex', flexDirection: 'column' }}
+                  style={{ minHeight: '500px', display: 'flex', flexDirection: 'column' }}
                   styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column' } }}
                 >
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -984,14 +979,16 @@ const HttpParserPage: React.FC = () => {
                         title="전체 화면으로 편집"
                       />
                     </div>
-                    <Input
+                    <TextArea
                       value={inputUrl}
                       onChange={(e) => setInputUrl(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder="https://api.example.com/users/123/posts?page=1&limit=10"
-                      style={{ marginBottom: 16 }}
+                      style={{ marginBottom: 16, resize: 'vertical' }}
+                      rows={3}
+                      autoSize={{ minRows: 2, maxRows: 6 }}
                     />
-                    
+
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 템플릿 (선택사항)</Text>
                       {templateAnalysis && (templateAnalysis.dynamicCount > 0 || templateAnalysis.dynamicQueryCount > 0) && (
@@ -1015,7 +1012,7 @@ const HttpParserPage: React.FC = () => {
                         title="전체 화면으로 편집"
                       />
                     </div>
-                    
+
                     {showTemplateSuggestions && templateAnalysis && (
                       <div style={{ marginBottom: 12, padding: '12px', backgroundColor: '#f0f9ff', border: '1px solid #bae7ff', borderRadius: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
@@ -1102,7 +1099,7 @@ const HttpParserPage: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     <Input
                       value={pathTemplate}
                       onChange={(e) => setPathTemplate(e.target.value)}
@@ -1111,8 +1108,8 @@ const HttpParserPage: React.FC = () => {
                       suffix={templateMatchStatus && (
                         <Tooltip title={
                           templateMatchStatus === 'success' ? '템플릿이 URL과 일치합니다' :
-                          templateMatchStatus === 'warning' ? '템플릿이 부분적으로 일치합니다' :
-                          '템플릿이 URL과 일치하지 않습니다'
+                            templateMatchStatus === 'warning' ? '템플릿이 부분적으로 일치합니다' :
+                              '템플릿이 URL과 일치하지 않습니다'
                         }>
                           {templateMatchStatus === 'success' ? (
                             <CheckOutlined style={{ color: '#52c41a' }} />
@@ -1144,16 +1141,16 @@ const HttpParserPage: React.FC = () => {
                   </div>
                 </Card>
               </Col>
-              
+
               <Col span={12}>
                 <div style={{ height: '500px', overflow: 'auto' }}>
                   {(realtimeParsedResult || parsedResult) && renderParsedResult(realtimeParsedResult || parsedResult)}
                   {!realtimeParsedResult && !parsedResult && inputUrl.trim() && (
                     <Card title="파싱 결과" style={{ height: '100%' }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         height: '400px',
                         color: '#999',
                         textAlign: 'center'
@@ -1178,7 +1175,7 @@ const HttpParserPage: React.FC = () => {
               <Col span={12}>
                 <Card
                   title="URL 생성 설정"
-                  style={{ height: '500px', display: 'flex', flexDirection: 'column' }}
+                  style={{ minHeight: '500px', display: 'flex', flexDirection: 'column' }}
                   styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', padding: '16px' } }}
                 >
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -1198,7 +1195,7 @@ const HttpParserPage: React.FC = () => {
                       placeholder="https://api.example.com"
                       style={{ marginBottom: 16 }}
                     />
-                    
+
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 템플릿</Text>
                       <Button
@@ -1244,7 +1241,7 @@ const HttpParserPage: React.FC = () => {
                       style={{ marginBottom: 16, fontFamily: 'monospace' }}
                       rows={3}
                     />
-                    
+
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>쿼리 파라미터 (JSON)</Text>
                     </div>
@@ -1259,7 +1256,7 @@ const HttpParserPage: React.FC = () => {
                   </div>
                 </Card>
               </Col>
-              
+
               <Col span={12}>
                 <Card
                   title={
@@ -1310,10 +1307,10 @@ const HttpParserPage: React.FC = () => {
           fullScreenType === 'input'
             ? (mode === 'parse' ? 'URL 편집' : '베이스 URL 편집')
             : fullScreenType === 'template'
-            ? '경로 템플릿 편집'
-            : fullScreenType === 'queryTemplate'
-            ? '쿼리 템플릿 편집'
-            : (mode === 'parse' ? '파싱 결과 보기' : '생성된 URL 보기')
+              ? '경로 템플릿 편집'
+              : fullScreenType === 'queryTemplate'
+                ? '쿼리 템플릿 편집'
+                : (mode === 'parse' ? '파싱 결과 보기' : '생성된 URL 보기')
         }
         open={fullScreenModalVisible}
         onCancel={() => setFullScreenModalVisible(false)}
