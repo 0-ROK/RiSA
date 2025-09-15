@@ -123,6 +123,10 @@ const HttpParserPage: React.FC = () => {
   const [pathParamsError, setPathParamsError] = useState<string | null>(null);
   const [queryParamsError, setQueryParamsError] = useState<string | null>(null);
 
+  // Query template validation states
+  const [queryTemplateError, setQueryTemplateError] = useState<string | null>(null);
+  const [buildQueryTemplateError, setBuildQueryTemplateError] = useState<string | null>(null);
+
   // 자동 템플릿 분석 함수들
   const detectParamType = (value: string): 'number' | 'uuid' | 'string' => {
     // UUID 패턴 검사
@@ -355,6 +359,17 @@ const HttpParserPage: React.FC = () => {
     setQueryParamsError(error);
   }, [queryParamsInput]);
 
+  // Real-time validation for query templates
+  useEffect(() => {
+    const error = validateQueryTemplate(queryTemplate);
+    setQueryTemplateError(error);
+  }, [queryTemplate]);
+
+  useEffect(() => {
+    const error = validateQueryTemplate(buildQueryTemplate);
+    setBuildQueryTemplateError(error);
+  }, [buildQueryTemplate]);
+
   const parseUrl = (urlString: string, pathTemplate?: string, queryTemplate?: string): ParsedUrl | null => {
     try {
       const url = new URL(urlString);
@@ -385,10 +400,9 @@ const HttpParserPage: React.FC = () => {
       // Query template parsing
       if (queryTemplate) {
         try {
-          // Try to parse as JSON array first (new format)
-          const queryKeys = JSON.parse(queryTemplate);
-          if (Array.isArray(queryKeys)) {
-            // Array format: ["page", "limit"]
+          // Use flexible query template parser
+          const queryKeys = parseQueryTemplate(queryTemplate);
+          if (queryKeys.length > 0) {
             const urlParams = new URLSearchParams(url.search);
             queryKeys.forEach(key => {
               const urlValue = urlParams.get(key);
@@ -396,12 +410,9 @@ const HttpParserPage: React.FC = () => {
                 queryParams[key] = urlValue;
               }
             });
-          } else {
-            // Fallback to old format parsing for compatibility
-            parseOldQueryTemplate();
           }
         } catch {
-          // If JSON parsing fails, try old format for compatibility
+          // If flexible parsing fails, try old format for compatibility
           parseOldQueryTemplate();
         }
 
@@ -486,10 +497,9 @@ const HttpParserPage: React.FC = () => {
 
       if (template.queryTemplate) {
         try {
-          // Try to parse as JSON array first (new format)
-          const queryKeys = JSON.parse(template.queryTemplate);
-          if (Array.isArray(queryKeys)) {
-            // Array format: ["page", "limit"]
+          // Use flexible query template parser
+          const queryKeys = parseQueryTemplate(template.queryTemplate);
+          if (queryKeys.length > 0) {
             const queryParts: string[] = [];
             queryKeys.forEach(key => {
               const paramValue = template.queryParams[key];
@@ -498,12 +508,9 @@ const HttpParserPage: React.FC = () => {
               }
             });
             queryString = queryParts.join('&');
-          } else {
-            // Fallback to old format for compatibility
-            buildOldQueryTemplate();
           }
         } catch {
-          // If JSON parsing fails, try old format for compatibility
+          // If flexible parsing fails, try old format for compatibility
           buildOldQueryTemplate();
         }
 
@@ -657,6 +664,66 @@ const HttpParserPage: React.FC = () => {
         success: false,
         message: '올바른 URL 형식이 아닙니다.'
       };
+    }
+  };
+
+  // Parse query template with flexible format support
+  const parseQueryTemplate = (input: string): string[] => {
+    if (!input.trim()) return [];
+
+    const trimmed = input.trim();
+
+    // Must be an array format
+    if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+      throw new Error('쿼리 템플릿은 배열 형식이어야 합니다. 예시: ["page", "limit"]');
+    }
+
+    // Remove brackets and get content
+    const content = trimmed.slice(1, -1).trim();
+    if (!content) return [];
+
+    try {
+      // First try standard JSON parsing
+      const parsed = JSON.parse(`[${content}]`);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => String(item));
+      }
+      throw new Error('배열이 아닙니다.');
+    } catch (strictError) {
+      // Try flexible parsing
+      try {
+        let flexibleContent = content;
+
+        // Handle single quotes: convert to double quotes
+        flexibleContent = flexibleContent.replace(/'/g, '"');
+
+        // Handle unquoted simple identifiers
+        // Match word patterns that are not already quoted
+        flexibleContent = flexibleContent.replace(/(?:^|,)\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=,|$)/g, (match, word) => {
+          return match.replace(word, `"${word}"`);
+        });
+
+        // Parse the converted string
+        const parsed = JSON.parse(`[${flexibleContent}]`);
+        if (Array.isArray(parsed)) {
+          return parsed.map(item => String(item));
+        }
+        throw new Error('배열이 아닙니다.');
+      } catch (flexibleError) {
+        throw new Error('올바른 배열 형식이 아닙니다. 예시: ["page", "limit"] 또는 [page, limit] 또는 [\'page\', \'limit\']');
+      }
+    }
+  };
+
+  // Validate query template and return error message if invalid
+  const validateQueryTemplate = (input: string): string | null => {
+    if (!input.trim()) return null; // Empty input is valid
+
+    try {
+      parseQueryTemplate(input);
+      return null; // Valid query template
+    } catch (error) {
+      return error instanceof Error ? error.message : '올바른 쿼리 템플릿 형식이 아닙니다.';
     }
   };
 
@@ -1497,8 +1564,20 @@ const HttpParserPage: React.FC = () => {
                     <Input
                       value={queryTemplate}
                       onChange={(e) => setQueryTemplate(e.target.value)}
-                      placeholder='["page", "limit"]'
+                      placeholder={`["page", "limit"] 또는 [page, limit] 또는 ['page', 'limit']`}
+                      status={queryTemplateError ? 'error' : undefined}
+                      style={{ marginBottom: queryTemplateError ? 8 : 0 }}
                     />
+                    {queryTemplateError && (
+                      <div style={{
+                        marginBottom: 8,
+                        color: '#ff4d4f',
+                        fontSize: '12px',
+                        paddingLeft: '12px'
+                      }}>
+                        {queryTemplateError}
+                      </div>
+                    )}
                   </div>
                 </Card>
               </Col>
@@ -1620,9 +1699,20 @@ const HttpParserPage: React.FC = () => {
                     <Input
                       value={buildQueryTemplate}
                       onChange={(e) => setBuildQueryTemplate(e.target.value)}
-                      placeholder='["page", "limit"]'
-                      style={{ marginBottom: 16 }}
+                      placeholder={`["page", "limit"] 또는 [page, limit] 또는 ['page', 'limit']`}
+                      status={buildQueryTemplateError ? 'error' : undefined}
+                      style={{ marginBottom: buildQueryTemplateError ? 8 : 16 }}
                     />
+                    {buildQueryTemplateError && (
+                      <div style={{
+                        marginBottom: 16,
+                        color: '#ff4d4f',
+                        fontSize: '12px',
+                        paddingLeft: '12px'
+                      }}>
+                        {buildQueryTemplateError}
+                      </div>
+                    )}
 
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 파라미터 (JSON)</Text>
