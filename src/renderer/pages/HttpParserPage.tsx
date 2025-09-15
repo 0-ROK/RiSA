@@ -46,10 +46,20 @@ interface PathSegment {
   suggestions?: string[];
 }
 
+interface QueryParam {
+  key: string;
+  value: string;
+  isDynamic: boolean;
+  paramType?: 'number' | 'uuid' | 'string';
+}
+
 interface TemplateAnalysis {
   segments: PathSegment[];
+  queryParams: QueryParam[];
   suggestedTemplate: string;
+  suggestedQueryTemplate: string;
   dynamicCount: number;
+  dynamicQueryCount: number;
 }
 
 interface ParsedUrl {
@@ -65,6 +75,7 @@ interface ParsedUrl {
 interface UrlTemplate {
   baseUrl: string;
   pathTemplate: string;
+  queryTemplate: string;
   pathParams: Record<string, string>;
   queryParams: Record<string, string>;
 }
@@ -74,17 +85,19 @@ const HttpParserPage: React.FC = () => {
   const [mode, setMode] = useState<OperationMode>('parse');
   const [inputUrl, setInputUrl] = useState('');
   const [pathTemplate, setPathTemplate] = useState('');
+  const [queryTemplate, setQueryTemplate] = useState('');
   const [parsedResult, setParsedResult] = useState<ParsedUrl | null>(null);
-  
+
   // Build mode states
   const [baseUrl, setBaseUrl] = useState('');
   const [buildPathTemplate, setBuildPathTemplate] = useState('');
+  const [buildQueryTemplate, setBuildQueryTemplate] = useState('');
   const [pathParamsInput, setPathParamsInput] = useState('');
   const [queryParamsInput, setQueryParamsInput] = useState('');
   const [builtUrl, setBuiltUrl] = useState('');
   
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
-  const [fullScreenType, setFullScreenType] = useState<'input' | 'output' | 'template'>('input');
+  const [fullScreenType, setFullScreenType] = useState<'input' | 'output' | 'template' | 'queryTemplate'>('input');
   const [fullScreenContent, setFullScreenContent] = useState('');
   const [templateAnalysis, setTemplateAnalysis] = useState<TemplateAnalysis | null>(null);
   const [showTemplateSuggestions, setShowTemplateSuggestions] = useState(false);
@@ -147,23 +160,38 @@ const HttpParserPage: React.FC = () => {
     }
   };
 
+  const detectQueryParamType = (value: string): 'number' | 'uuid' | 'string' => {
+    // UUID 패턴 검사
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(value)) {
+      return 'uuid';
+    }
+
+    // 숫자 패턴 검사
+    if (/^\d+$/.test(value) && value.length > 0) {
+      return 'number';
+    }
+
+    return 'string';
+  };
+
   const analyzeUrlForTemplate = (urlString: string): TemplateAnalysis | null => {
     try {
       const url = new URL(urlString);
       const pathSegments = url.pathname.split('/').filter(segment => segment);
-      
+
       const segments: PathSegment[] = pathSegments.map((segment, index) => {
         const type = detectParamType(segment);
-        
+
         // 동적 파라미터로 판단하는 조건
-        const isDynamic = 
-          type === 'uuid' || 
-          (type === 'number' && segment.length > 2) || 
+        const isDynamic =
+          type === 'uuid' ||
+          (type === 'number' && segment.length > 2) ||
           (type === 'string' && segment.length > 20) ||
           /^[a-f0-9]{24}$/i.test(segment); // MongoDB ObjectId 패턴
-        
+
         const paramName = isDynamic ? generateParamName(segment, index, pathSegments) : undefined;
-        
+
         // 파라미터 이름 제안
         const suggestions = isDynamic ? [
           paramName!,
@@ -181,18 +209,47 @@ const HttpParserPage: React.FC = () => {
         };
       });
 
+      // 쿼리 파라미터 분석
+      const queryParams: QueryParam[] = [];
+      url.searchParams.forEach((value, key) => {
+        const type = detectQueryParamType(value);
+
+        // 동적 쿼리 파라미터로 판단하는 조건
+        const isDynamic =
+          type === 'uuid' ||
+          (type === 'number' && value.length > 2 && parseInt(value) > 1000) ||
+          (type === 'string' && value.length > 15) ||
+          /^[a-f0-9]{24}$/i.test(value); // MongoDB ObjectId 패턴
+
+        queryParams.push({
+          key,
+          value,
+          isDynamic,
+          paramType: isDynamic ? type : undefined
+        });
+      });
+
       // 동적 파라미터 개수 계산
       const dynamicCount = segments.filter(s => s.isDynamic).length;
+      const dynamicQueryCount = queryParams.filter(q => q.isDynamic).length;
 
       // 템플릿 생성
-      const suggestedTemplate = '/' + segments.map(segment => 
+      const suggestedTemplate = '/' + segments.map(segment =>
         segment.isDynamic ? `:${segment.paramName}` : segment.value
       ).join('/');
 
+      // 쿼리 템플릿 생성
+      const suggestedQueryTemplate = queryParams.map(param =>
+        param.isDynamic ? `${param.key}=:${param.key}` : `${param.key}=${param.value}`
+      ).join('&');
+
       return {
         segments,
+        queryParams,
         suggestedTemplate,
-        dynamicCount
+        suggestedQueryTemplate,
+        dynamicCount,
+        dynamicQueryCount
       };
     } catch (error) {
       return null;
@@ -241,22 +298,22 @@ const HttpParserPage: React.FC = () => {
     if (mode === 'parse' && inputUrl.trim()) {
       const analysis = analyzeUrlForTemplate(inputUrl);
       setTemplateAnalysis(analysis);
-      if (analysis && analysis.dynamicCount > 0 && !pathTemplate) {
+      if (analysis && (analysis.dynamicCount > 0 || analysis.dynamicQueryCount > 0) && (!pathTemplate && !queryTemplate)) {
         setShowTemplateSuggestions(true);
       }
     } else {
       setTemplateAnalysis(null);
       setShowTemplateSuggestions(false);
     }
-  }, [inputUrl, mode, pathTemplate]);
+  }, [inputUrl, mode, pathTemplate, queryTemplate]);
 
   // 실시간 파싱 및 템플릿 매칭 검증
   useEffect(() => {
     if (mode === 'parse' && inputUrl.trim()) {
       // 실시간 파싱
-      const parsed = parseUrl(inputUrl, pathTemplate || undefined);
+      const parsed = parseUrl(inputUrl, pathTemplate || undefined, queryTemplate || undefined);
       setRealtimeParsedResult(parsed);
-      
+
       // 템플릿 매칭 검증
       if (pathTemplate.trim()) {
         const matchStatus = validateTemplateMatch(inputUrl, pathTemplate);
@@ -268,17 +325,18 @@ const HttpParserPage: React.FC = () => {
       setRealtimeParsedResult(null);
       setTemplateMatchStatus(null);
     }
-  }, [inputUrl, pathTemplate, mode]);
+  }, [inputUrl, pathTemplate, queryTemplate, mode]);
 
-  const parseUrl = (urlString: string, template?: string): ParsedUrl | null => {
+  const parseUrl = (urlString: string, pathTemplate?: string, queryTemplate?: string): ParsedUrl | null => {
     try {
       const url = new URL(urlString);
       const pathParams: Record<string, string> = {};
-      
-      if (template) {
-        const templateParts = template.split('/').filter(part => part);
+
+      // Path template parsing
+      if (pathTemplate) {
+        const templateParts = pathTemplate.split('/').filter(part => part);
         const urlParts = url.pathname.split('/').filter(part => part);
-        
+
         templateParts.forEach((templatePart, index) => {
           if (templatePart.startsWith(':')) {
             const paramName = templatePart.substring(1);
@@ -295,9 +353,42 @@ const HttpParserPage: React.FC = () => {
       }
 
       const queryParams: Record<string, string> = {};
-      url.searchParams.forEach((value, key) => {
-        queryParams[key] = value;
-      });
+
+      // Query template parsing
+      if (queryTemplate) {
+        const templatePairs = queryTemplate.split('&').filter(pair => pair);
+        const urlParams = new URLSearchParams(url.search);
+
+        templatePairs.forEach(templatePair => {
+          const [key, value] = templatePair.split('=');
+          if (key && value) {
+            if (value.startsWith(':')) {
+              const paramName = value.substring(1);
+              const urlValue = urlParams.get(key);
+              if (urlValue !== null) {
+                queryParams[paramName] = urlValue;
+              }
+            } else if (value.startsWith('{') && value.endsWith('}')) {
+              const paramName = value.slice(1, -1);
+              const urlValue = urlParams.get(key);
+              if (urlValue !== null) {
+                queryParams[paramName] = urlValue;
+              }
+            } else {
+              // Static value - include if matches
+              const urlValue = urlParams.get(key);
+              if (urlValue === value) {
+                queryParams[key] = urlValue;
+              }
+            }
+          }
+        });
+      } else {
+        // No query template - include all query parameters
+        url.searchParams.forEach((value, key) => {
+          queryParams[key] = value;
+        });
+      }
 
       return {
         protocol: url.protocol,
@@ -316,17 +407,18 @@ const HttpParserPage: React.FC = () => {
   const buildUrl = (template: UrlTemplate): string => {
     try {
       let fullUrl = template.baseUrl;
-      
+
+      // Build path
       if (template.pathTemplate) {
         let pathPart = template.pathTemplate;
-        
+
         // Replace path parameters
         Object.entries(template.pathParams).forEach(([key, value]) => {
           pathPart = pathPart
             .replace(`:${key}`, encodeURIComponent(value))
             .replace(`{${key}}`, encodeURIComponent(value));
         });
-        
+
         // Ensure proper URL joining
         if (!fullUrl.endsWith('/') && !pathPart.startsWith('/')) {
           fullUrl += '/';
@@ -334,20 +426,57 @@ const HttpParserPage: React.FC = () => {
         if (fullUrl.endsWith('/') && pathPart.startsWith('/')) {
           pathPart = pathPart.substring(1);
         }
-        
+
         fullUrl += pathPart;
       }
-      
-      // Add query parameters
-      const queryEntries = Object.entries(template.queryParams).filter(([_, value]) => value.trim() !== '');
-      if (queryEntries.length > 0) {
-        const searchParams = new URLSearchParams();
-        queryEntries.forEach(([key, value]) => {
-          searchParams.set(key, value);
+
+      // Build query string
+      let queryString = '';
+
+      if (template.queryTemplate) {
+        // Use query template
+        const templatePairs = template.queryTemplate.split('&').filter(pair => pair);
+        const queryParts: string[] = [];
+
+        templatePairs.forEach(templatePair => {
+          const [key, value] = templatePair.split('=');
+          if (key && value) {
+            if (value.startsWith(':')) {
+              const paramName = value.substring(1);
+              const paramValue = template.queryParams[paramName];
+              if (paramValue && paramValue.trim() !== '') {
+                queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
+              }
+            } else if (value.startsWith('{') && value.endsWith('}')) {
+              const paramName = value.slice(1, -1);
+              const paramValue = template.queryParams[paramName];
+              if (paramValue && paramValue.trim() !== '') {
+                queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
+              }
+            } else {
+              // Static value
+              queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+            }
+          }
         });
-        fullUrl += `?${searchParams.toString()}`;
+
+        queryString = queryParts.join('&');
+      } else {
+        // No query template - use all query parameters
+        const queryEntries = Object.entries(template.queryParams).filter(([_, value]) => value.trim() !== '');
+        if (queryEntries.length > 0) {
+          const searchParams = new URLSearchParams();
+          queryEntries.forEach(([key, value]) => {
+            searchParams.set(key, value);
+          });
+          queryString = searchParams.toString();
+        }
       }
-      
+
+      if (queryString) {
+        fullUrl += `?${queryString}`;
+      }
+
       return fullUrl;
     } catch (error) {
       throw new Error('URL 생성 중 오류가 발생했습니다.');
@@ -378,7 +507,7 @@ const HttpParserPage: React.FC = () => {
     }
 
     try {
-      const result = parseUrl(inputUrl, pathTemplate || undefined);
+      const result = parseUrl(inputUrl, pathTemplate || undefined, queryTemplate || undefined);
       if (!result) {
         throw new Error('올바른 URL 형식이 아닙니다.');
       }
@@ -387,10 +516,14 @@ const HttpParserPage: React.FC = () => {
       message.success('URL 파싱이 완료되었습니다.');
 
       // Save to history
+      const templateInfo = [];
+      if (pathTemplate) templateInfo.push(`경로 템플릿: ${pathTemplate}`);
+      if (queryTemplate) templateInfo.push(`쿼리 템플릿: ${queryTemplate}`);
+
       const historyItem: HistoryItem = {
         id: crypto.randomUUID(),
         type: 'http-parse' as any,
-        inputText: inputUrl + (pathTemplate ? `\n템플릿: ${pathTemplate}` : ''),
+        inputText: inputUrl + (templateInfo.length > 0 ? `\n${templateInfo.join('\n')}` : ''),
         outputText: JSON.stringify(result, null, 2),
         success: true,
         timestamp: new Date(),
@@ -436,6 +569,7 @@ const HttpParserPage: React.FC = () => {
       const template: UrlTemplate = {
         baseUrl: baseUrl.trim(),
         pathTemplate: buildPathTemplate.trim(),
+        queryTemplate: buildQueryTemplate.trim(),
         pathParams,
         queryParams
       };
@@ -488,8 +622,12 @@ const HttpParserPage: React.FC = () => {
     }
   };
 
-  const applyTemplateSuggestion = (suggestion: string) => {
-    setPathTemplate(suggestion);
+  const applyTemplateSuggestion = (suggestion: string, type: 'path' | 'query' | string = 'path') => {
+    if (type === 'path') {
+      setPathTemplate(suggestion);
+    } else if (type === 'query') {
+      setQueryTemplate(suggestion);
+    }
     setShowTemplateSuggestions(false);
   };
 
@@ -531,26 +669,30 @@ const HttpParserPage: React.FC = () => {
   const handleClear = () => {
     setInputUrl('');
     setPathTemplate('');
+    setQueryTemplate('');
     setParsedResult(null);
     setBaseUrl('');
     setBuildPathTemplate('');
+    setBuildQueryTemplate('');
     setPathParamsInput('');
     setQueryParamsInput('');
     setBuiltUrl('');
   };
 
-  const handleFullScreenEdit = (type: 'input' | 'output' | 'template') => {
+  const handleFullScreenEdit = (type: 'input' | 'output' | 'template' | 'queryTemplate') => {
     let content = '';
     if (type === 'input') {
       content = mode === 'parse' ? inputUrl : baseUrl;
     } else if (type === 'template') {
       content = mode === 'parse' ? pathTemplate : buildPathTemplate;
+    } else if (type === 'queryTemplate') {
+      content = mode === 'parse' ? queryTemplate : buildQueryTemplate;
     } else {
-      content = mode === 'parse' 
+      content = mode === 'parse'
         ? (parsedResult ? JSON.stringify(parsedResult, null, 2) : '')
         : builtUrl;
     }
-    
+
     setFullScreenType(type);
     setFullScreenContent(content);
     setFullScreenModalVisible(true);
@@ -568,6 +710,12 @@ const HttpParserPage: React.FC = () => {
         setPathTemplate(fullScreenContent);
       } else {
         setBuildPathTemplate(fullScreenContent);
+      }
+    } else if (fullScreenType === 'queryTemplate') {
+      if (mode === 'parse') {
+        setQueryTemplate(fullScreenContent);
+      } else {
+        setBuildQueryTemplate(fullScreenContent);
       }
     }
     setFullScreenModalVisible(false);
@@ -846,8 +994,8 @@ const HttpParserPage: React.FC = () => {
                     
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 템플릿 (선택사항)</Text>
-                      {templateAnalysis && templateAnalysis.dynamicCount > 0 && (
-                        <Tooltip title={`${templateAnalysis.dynamicCount}개의 동적 파라미터 감지됨`}>
+                      {templateAnalysis && (templateAnalysis.dynamicCount > 0 || templateAnalysis.dynamicQueryCount > 0) && (
+                        <Tooltip title={`${templateAnalysis.dynamicCount}개의 동적 경로 파라미터, ${templateAnalysis.dynamicQueryCount}개의 동적 쿼리 파라미터 감지됨`}>
                           <Button
                             size="small"
                             icon={<BulbOutlined />}
@@ -855,7 +1003,7 @@ const HttpParserPage: React.FC = () => {
                             style={{ marginLeft: 8 }}
                             type={showTemplateSuggestions ? "primary" : "default"}
                           >
-                            자동 감지 ({templateAnalysis.dynamicCount})
+                            자동 감지 ({templateAnalysis.dynamicCount + templateAnalysis.dynamicQueryCount})
                           </Button>
                         </Tooltip>
                       )}
@@ -873,38 +1021,83 @@ const HttpParserPage: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                           <BulbOutlined style={{ color: '#1890ff', marginRight: 4 }} />
                           <Text strong style={{ color: '#1890ff' }}>
-                            템플릿 제안 - {templateAnalysis.dynamicCount}개의 동적 파라미터 발견
+                            템플릿 제안 - {templateAnalysis.dynamicCount}개의 경로 파라미터, {templateAnalysis.dynamicQueryCount}개의 쿼리 파라미터 발견
                           </Text>
-                          <Button 
-                            type="text" 
-                            size="small" 
+                          <Button
+                            type="text"
+                            size="small"
                             onClick={dismissTemplateSuggestions}
                             style={{ marginLeft: 'auto' }}
                           >
                             ✕
                           </Button>
                         </div>
-                        
-                        <div style={{ marginBottom: 12, padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e1f5fe' }}>
-                          <Text code style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                            {templateAnalysis.suggestedTemplate}
-                          </Text>
-                        </div>
-                        
+
+                        {templateAnalysis.dynamicCount > 0 && (
+                          <>
+                            <div style={{ marginBottom: 4 }}>
+                              <Text strong style={{ fontSize: '12px' }}>경로 템플릿:</Text>
+                            </div>
+                            <div style={{ marginBottom: 8, padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e1f5fe' }}>
+                              <Text code style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                                {templateAnalysis.suggestedTemplate}
+                              </Text>
+                              <Button
+                                size="small"
+                                style={{ marginLeft: 8 }}
+                                onClick={() => applyTemplateSuggestion(templateAnalysis.suggestedTemplate, 'path')}
+                              >
+                                경로 템플릿 적용
+                              </Button>
+                            </div>
+                          </>
+                        )}
+
+                        {templateAnalysis.dynamicQueryCount > 0 && (
+                          <>
+                            <div style={{ marginBottom: 4 }}>
+                              <Text strong style={{ fontSize: '12px' }}>쿼리 템플릿:</Text>
+                            </div>
+                            <div style={{ marginBottom: 8, padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e1f5fe' }}>
+                              <Text code style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                                {templateAnalysis.suggestedQueryTemplate}
+                              </Text>
+                              <Button
+                                size="small"
+                                style={{ marginLeft: 8 }}
+                                onClick={() => applyTemplateSuggestion(templateAnalysis.suggestedQueryTemplate, 'query')}
+                              >
+                                쿼리 템플릿 적용
+                              </Button>
+                            </div>
+                          </>
+                        )}
+
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              감지된 파라미터: {templateAnalysis.segments.filter(s => s.isDynamic).map(s => 
+                              경로: {templateAnalysis.segments.filter(s => s.isDynamic).map(s =>
                                 `${s.paramName} (${s.paramType})`
+                              ).join(', ')}
+                              {templateAnalysis.dynamicCount > 0 && templateAnalysis.dynamicQueryCount > 0 && ' | '}
+                              쿼리: {templateAnalysis.queryParams.filter(q => q.isDynamic).map(q =>
+                                `${q.key} (${q.paramType})`
                               ).join(', ')}
                             </Text>
                           </div>
                           <Button
                             size="small"
                             type="primary"
-                            onClick={() => applyTemplateSuggestion(templateAnalysis.suggestedTemplate)}
+                            onClick={() => {
+                              if (templateAnalysis.dynamicCount > 0) {
+                                applyTemplateSuggestion(templateAnalysis.suggestedTemplate, 'path');
+                              }
+                              if (templateAnalysis.dynamicQueryCount > 0) {
+                                applyTemplateSuggestion(templateAnalysis.suggestedQueryTemplate, 'query');
+                              }
+                            }}
                           >
-                            적용
+                            모두 적용
                           </Button>
                         </div>
                       </div>
@@ -930,6 +1123,23 @@ const HttpParserPage: React.FC = () => {
                           )}
                         </Tooltip>
                       )}
+                      style={{ marginBottom: 16 }}
+                    />
+
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong>쿼리 템플릿 (선택사항)</Text>
+                      <Button
+                        size="small"
+                        icon={<ExpandOutlined />}
+                        onClick={() => handleFullScreenEdit('queryTemplate')}
+                        style={{ float: 'right' }}
+                        title="전체 화면으로 편집"
+                      />
+                    </div>
+                    <Input
+                      value={queryTemplate}
+                      onChange={(e) => setQueryTemplate(e.target.value)}
+                      placeholder="page=:page&limit=:limit 또는 page={page}&limit={limit}"
                     />
                   </div>
                 </Card>
@@ -1005,7 +1215,24 @@ const HttpParserPage: React.FC = () => {
                       placeholder="/users/:userId/posts"
                       style={{ marginBottom: 16 }}
                     />
-                    
+
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong>쿼리 템플릿</Text>
+                      <Button
+                        size="small"
+                        icon={<ExpandOutlined />}
+                        onClick={() => handleFullScreenEdit('queryTemplate')}
+                        style={{ float: 'right' }}
+                        title="전체 화면으로 편집"
+                      />
+                    </div>
+                    <Input
+                      value={buildQueryTemplate}
+                      onChange={(e) => setBuildQueryTemplate(e.target.value)}
+                      placeholder="page=:page&limit=:limit"
+                      style={{ marginBottom: 16 }}
+                    />
+
                     <div style={{ marginBottom: 8 }}>
                       <Text strong>경로 파라미터 (JSON)</Text>
                     </div>
@@ -1080,10 +1307,12 @@ const HttpParserPage: React.FC = () => {
       {/* Full Screen Modal */}
       <Modal
         title={
-          fullScreenType === 'input' 
+          fullScreenType === 'input'
             ? (mode === 'parse' ? 'URL 편집' : '베이스 URL 편집')
             : fullScreenType === 'template'
             ? '경로 템플릿 편집'
+            : fullScreenType === 'queryTemplate'
+            ? '쿼리 템플릿 편집'
             : (mode === 'parse' ? '파싱 결과 보기' : '생성된 URL 보기')
         }
         open={fullScreenModalVisible}
