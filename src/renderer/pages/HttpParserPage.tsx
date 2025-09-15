@@ -543,8 +543,12 @@ const HttpParserPage: React.FC = () => {
 
   const parseJsonParams = (jsonString: string): Record<string, string> => {
     if (!jsonString.trim()) return {};
+
+    const input = jsonString.trim();
+
     try {
-      const parsed = JSON.parse(jsonString);
+      // First try standard JSON.parse
+      const parsed = JSON.parse(input);
       if (typeof parsed === 'object' && parsed !== null) {
         const result: Record<string, string> = {};
         Object.entries(parsed).forEach(([key, value]) => {
@@ -553,8 +557,37 @@ const HttpParserPage: React.FC = () => {
         return result;
       }
       return {};
-    } catch (error) {
-      throw new Error('올바른 JSON 형식이 아닙니다.');
+    } catch (strictJsonError) {
+      // If strict JSON fails, try flexible parsing
+      try {
+        // Convert JavaScript object literal to valid JSON
+        let flexibleInput = input;
+
+        // Handle single quotes: convert to double quotes
+        flexibleInput = flexibleInput.replace(/'/g, '"');
+
+        // Handle unquoted keys: add quotes around keys
+        // This regex finds word patterns followed by colon (unquoted keys)
+        flexibleInput = flexibleInput.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+
+        // Handle unquoted string values (only simple alphanumeric strings)
+        // Match: "key": value (where value is not already quoted, number, boolean, null)
+        flexibleInput = flexibleInput.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*([,}])/g, ': "$1"$2');
+
+        // Parse the converted string
+        const parsed = JSON.parse(flexibleInput);
+        if (typeof parsed === 'object' && parsed !== null) {
+          const result: Record<string, string> = {};
+          Object.entries(parsed).forEach(([key, value]) => {
+            result[key] = String(value);
+          });
+          return result;
+        }
+        return {};
+      } catch (flexibleParseError) {
+        // If both approaches fail, provide helpful error message
+        throw new Error('올바른 JSON 형식이 아닙니다. 예시: {"key": "value"} 또는 {key: "value"} 또는 {key: 123}');
+      }
     }
   };
 
