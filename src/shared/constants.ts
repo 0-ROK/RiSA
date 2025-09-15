@@ -143,4 +143,11 @@ export const IPC_CHANNELS = {
   CHECK_FOR_UPDATES: 'check-for-updates',
   RESTART_AND_INSTALL: 'restart-and-install',
   START_DOWNLOAD: 'start-download',
+
+  // HTTP templates
+  GET_HTTP_TEMPLATES: 'get-http-templates',
+  SAVE_HTTP_TEMPLATE: 'save-http-template',
+  UPDATE_HTTP_TEMPLATE: 'update-http-template',
+  DELETE_HTTP_TEMPLATE: 'delete-http-template',
+  USE_HTTP_TEMPLATE: 'use-http-template',
 } as const;

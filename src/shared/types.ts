@@ -113,3 +113,25 @@ export interface HistoryFilter {
   dateTo?: Date;
   chainId?: string;
 }
+
+// HTTP Template types
+export interface HttpTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  baseUrl: string;
+  pathTemplate: string;
+  queryTemplate: string;
+  created: Date;
+  lastUsed?: Date;
+  tags?: string[];
+  category?: 'api' | 'web' | 'custom';
+}
+
+export interface HttpTemplateUsage {
+  templateId: string;
+  pathParams: Record<string, string>;
+  queryParams: Record<string, string>;
+  generatedUrl: string;
+  timestamp: Date;
+}

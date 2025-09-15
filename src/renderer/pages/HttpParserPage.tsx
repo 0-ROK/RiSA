@@ -15,7 +15,9 @@ import {
   Tag,
   Divider,
   Tooltip,
-  Popover
+  Popover,
+  Form,
+  Select
 } from 'antd';
 import {
   LinkOutlined,
@@ -27,10 +29,15 @@ import {
   ApiOutlined,
   EditOutlined,
   BulbOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  SaveOutlined,
+  UnorderedListOutlined,
+  DeleteOutlined,
+  LoadingOutlined
 } from '@ant-design/icons';
 import { useHistory } from '../store/HistoryContext';
-import { HistoryItem } from '../../shared/types';
+import { useHttpTemplate } from '../store/HttpTemplateContext';
+import { HistoryItem, HttpTemplate } from '../../shared/types';
 import PageHeader from '../components/PageHeader';
 
 const { TextArea } = Input;
@@ -82,6 +89,7 @@ interface UrlTemplate {
 
 const HttpParserPage: React.FC = () => {
   const { saveHistoryItem } = useHistory();
+  const { templates, loading, saveTemplate, deleteTemplate, updateTemplate } = useHttpTemplate();
   const [mode, setMode] = useState<OperationMode>('parse');
   const [inputUrl, setInputUrl] = useState('');
   const [pathTemplate, setPathTemplate] = useState('');
@@ -103,6 +111,13 @@ const HttpParserPage: React.FC = () => {
   const [showTemplateSuggestions, setShowTemplateSuggestions] = useState(false);
   const [templateMatchStatus, setTemplateMatchStatus] = useState<'success' | 'warning' | 'error' | null>(null);
   const [realtimeParsedResult, setRealtimeParsedResult] = useState<ParsedUrl | null>(null);
+
+  // Save template modal states
+  const [saveTemplateModalVisible, setSaveTemplateModalVisible] = useState(false);
+  const [saveTemplateForm] = Form.useForm();
+
+  // Template management states
+  const [showTemplatesList, setShowTemplatesList] = useState(false);
 
   // 자동 템플릿 분석 함수들
   const detectParamType = (value: string): 'number' | 'uuid' | 'string' => {
@@ -776,6 +791,102 @@ const HttpParserPage: React.FC = () => {
     }
   };
 
+  const handleSaveTemplate = () => {
+    if (mode === 'parse') {
+      // Parse mode - use current input and templates
+      if (!inputUrl.trim()) {
+        message.error('저장할 URL을 입력해주세요.');
+        return;
+      }
+
+      try {
+        const url = new URL(inputUrl);
+        saveTemplateForm.setFieldsValue({
+          name: `${url.hostname} 템플릿`,
+          description: `${url.pathname}에 대한 API 템플릿`,
+          baseUrl: `${url.protocol}//${url.host}`,
+          pathTemplate: pathTemplate || url.pathname,
+          queryTemplate: queryTemplate || '',
+          category: 'api',
+          tags: []
+        });
+      } catch {
+        saveTemplateForm.setFieldsValue({
+          name: '새 HTTP 템플릿',
+          description: '',
+          baseUrl: '',
+          pathTemplate: pathTemplate,
+          queryTemplate: queryTemplate,
+          category: 'custom',
+          tags: []
+        });
+      }
+    } else {
+      // Build mode - use build form values
+      saveTemplateForm.setFieldsValue({
+        name: '새 HTTP 템플릿',
+        description: '',
+        baseUrl: baseUrl,
+        pathTemplate: buildPathTemplate,
+        queryTemplate: buildQueryTemplate,
+        category: 'custom',
+        tags: []
+      });
+    }
+
+    setSaveTemplateModalVisible(true);
+  };
+
+  const handleSaveTemplateSubmit = async () => {
+    try {
+      const values = await saveTemplateForm.validateFields();
+
+      const template: HttpTemplate = {
+        id: crypto.randomUUID(),
+        name: values.name,
+        description: values.description || '',
+        baseUrl: values.baseUrl,
+        pathTemplate: values.pathTemplate,
+        queryTemplate: values.queryTemplate,
+        created: new Date(),
+        tags: values.tags || [],
+        category: values.category || 'custom',
+      };
+
+      await saveTemplate(template);
+      message.success('템플릿이 저장되었습니다.');
+      setSaveTemplateModalVisible(false);
+      saveTemplateForm.resetFields();
+    } catch (error) {
+      if (error instanceof Error) {
+        message.error(`템플릿 저장 실패: ${error.message}`);
+      }
+    }
+  };
+
+  const handleLoadTemplate = (template: HttpTemplate) => {
+    if (mode === 'parse') {
+      setInputUrl(''); // Clear current URL to allow template-based input
+      setPathTemplate(template.pathTemplate);
+      setQueryTemplate(template.queryTemplate);
+    } else {
+      setBaseUrl(template.baseUrl);
+      setBuildPathTemplate(template.pathTemplate);
+      setBuildQueryTemplate(template.queryTemplate);
+    }
+    message.success(`템플릿 "${template.name}"이 로드되었습니다.`);
+    setShowTemplatesList(false);
+  };
+
+  const handleDeleteTemplate = async (templateId: string, templateName: string) => {
+    try {
+      await deleteTemplate(templateId);
+      message.success(`템플릿 "${templateName}"이 삭제되었습니다.`);
+    } catch (error) {
+      message.error('템플릿 삭제에 실패했습니다.');
+    }
+  };
+
   const renderParsedResult = (result?: ParsedUrl | null) => {
     const resultToShow = result || parsedResult;
     if (!resultToShow) return null;
@@ -996,6 +1107,21 @@ const HttpParserPage: React.FC = () => {
                   </Button>
                 )}
                 <Button
+                  icon={<SaveOutlined />}
+                  onClick={handleSaveTemplate}
+                  title="현재 설정을 템플릿으로 저장"
+                >
+                  템플릿 저장
+                </Button>
+                <Button
+                  icon={<UnorderedListOutlined />}
+                  onClick={() => setShowTemplatesList(!showTemplatesList)}
+                  title="저장된 템플릿 목록 보기"
+                  type={showTemplatesList ? "primary" : "default"}
+                >
+                  템플릿 목록 ({templates.length})
+                </Button>
+                <Button
                   icon={<ClearOutlined />}
                   onClick={handleClear}
                   title="모든 입력 초기화"
@@ -1006,6 +1132,133 @@ const HttpParserPage: React.FC = () => {
             </Col>
           </Row>
         </Card>
+
+        {/* Templates List */}
+        {showTemplatesList && (
+          <Card
+            title={
+              <Space>
+                <UnorderedListOutlined />
+                <Text strong>저장된 HTTP 템플릿</Text>
+                {loading && <LoadingOutlined />}
+              </Space>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <LoadingOutlined style={{ fontSize: '24px' }} />
+                <div style={{ marginTop: '8px' }}>템플릿을 불러오는 중...</div>
+              </div>
+            ) : templates.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                <InfoCircleOutlined style={{ fontSize: '24px', marginBottom: '8px', display: 'block' }} />
+                저장된 템플릿이 없습니다. 위의 "템플릿 저장" 버튼을 사용하여 첫 번째 템플릿을 만들어보세요.
+              </div>
+            ) : (
+              <Row gutter={[16, 16]}>
+                {templates.map((template) => (
+                  <Col key={template.id} xs={24} sm={12} lg={8}>
+                    <Card
+                      size="small"
+                      title={
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text strong style={{ fontSize: '14px' }}>{template.name}</Text>
+                          <Tag color={template.category === 'api' ? 'blue' : template.category === 'web' ? 'green' : 'orange'}>
+                            {template.category?.toUpperCase()}
+                          </Tag>
+                        </div>
+                      }
+                      extra={
+                        <Popover
+                          content={
+                            <div>
+                              <Button
+                                size="small"
+                                type="text"
+                                icon={<LoadingOutlined />}
+                                onClick={() => handleLoadTemplate(template)}
+                                style={{ marginBottom: 4, width: '100%', textAlign: 'left' }}
+                              >
+                                템플릿 로드
+                              </Button>
+                              <Button
+                                size="small"
+                                type="text"
+                                danger
+                                icon={<DeleteOutlined />}
+                                onClick={() => handleDeleteTemplate(template.id, template.name)}
+                                style={{ width: '100%', textAlign: 'left' }}
+                              >
+                                삭제
+                              </Button>
+                            </div>
+                          }
+                          trigger="click"
+                        >
+                          <Button size="small" type="text">⋯</Button>
+                        </Popover>
+                      }
+                      actions={[
+                        <Button
+                          key="load"
+                          size="small"
+                          type="primary"
+                          block
+                          onClick={() => handleLoadTemplate(template)}
+                        >
+                          사용하기
+                        </Button>
+                      ]}
+                    >
+                      <div style={{ marginBottom: 8 }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                          {template.description || '설명 없음'}
+                        </Text>
+                      </div>
+                      <div style={{ marginBottom: 4 }}>
+                        <Text code style={{ fontSize: '11px', backgroundColor: '#f0f2f5' }}>
+                          {template.baseUrl}
+                        </Text>
+                      </div>
+                      {template.pathTemplate && (
+                        <div style={{ marginBottom: 4 }}>
+                          <Text code style={{ fontSize: '11px', backgroundColor: '#fff2e8' }}>
+                            {template.pathTemplate}
+                          </Text>
+                        </div>
+                      )}
+                      {template.queryTemplate && (
+                        <div style={{ marginBottom: 8 }}>
+                          <Text code style={{ fontSize: '11px', backgroundColor: '#f6ffed' }}>
+                            {template.queryTemplate}
+                          </Text>
+                        </div>
+                      )}
+                      {template.tags && template.tags.length > 0 && (
+                        <div>
+                          {template.tags.map(tag => (
+                            <Tag key={tag} style={{ fontSize: '10px', margin: '2px' }}>
+                              {tag}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ marginTop: 8, textAlign: 'right' }}>
+                        <Text type="secondary" style={{ fontSize: '10px' }}>
+                          {template.lastUsed ?
+                            `마지막 사용: ${new Date(template.lastUsed).toLocaleDateString()}` :
+                            `생성일: ${new Date(template.created).toLocaleDateString()}`
+                          }
+                        </Text>
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            )}
+          </Card>
+        )}
 
         {/* Parse Mode */}
         {mode === 'parse' && (
@@ -1419,6 +1672,93 @@ const HttpParserPage: React.FC = () => {
             fontSize: '14px'
           }}
         />
+      </Modal>
+
+      {/* Save Template Modal */}
+      <Modal
+        title="템플릿 저장"
+        open={saveTemplateModalVisible}
+        onCancel={() => {
+          setSaveTemplateModalVisible(false);
+          saveTemplateForm.resetFields();
+        }}
+        onOk={handleSaveTemplateSubmit}
+        okText="저장"
+        cancelText="취소"
+        width={600}
+      >
+        <Form
+          form={saveTemplateForm}
+          layout="vertical"
+          requiredMark={false}
+        >
+          <Form.Item
+            name="name"
+            label="템플릿 이름"
+            rules={[{ required: true, message: '템플릿 이름을 입력해주세요.' }]}
+          >
+            <Input placeholder="예: GitHub API 템플릿" />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="설명"
+          >
+            <Input.TextArea
+              placeholder="이 템플릿에 대한 설명을 입력하세요"
+              rows={2}
+            />
+          </Form.Item>
+
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                name="baseUrl"
+                label="베이스 URL"
+                rules={[{ required: true, message: '베이스 URL을 입력해주세요.' }]}
+              >
+                <Input placeholder="https://api.example.com" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="category"
+                label="카테고리"
+              >
+                <Select placeholder="카테고리 선택">
+                  <Select.Option value="api">API</Select.Option>
+                  <Select.Option value="web">웹</Select.Option>
+                  <Select.Option value="custom">커스텀</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="pathTemplate"
+            label="경로 템플릿"
+          >
+            <Input placeholder="/users/:userId/posts" />
+          </Form.Item>
+
+          <Form.Item
+            name="queryTemplate"
+            label="쿼리 템플릿"
+          >
+            <Input placeholder='["page", "limit"]' />
+          </Form.Item>
+
+          <Form.Item
+            name="tags"
+            label="태그"
+          >
+            <Select
+              mode="tags"
+              placeholder="태그를 입력하세요 (Enter로 추가)"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

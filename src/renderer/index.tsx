@@ -6,6 +6,7 @@ import App from './App';
 import { KeyProvider } from './store/KeyContext';
 import { HistoryProvider } from './store/HistoryContext';
 import { ChainProvider } from './store/ChainContext';
+import { HttpTemplateProvider } from './store/HttpTemplateContext';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
@@ -16,15 +17,17 @@ root.render(
       <KeyProvider>
         <HistoryProvider>
           <ChainProvider>
-            <ConfigProvider
-              theme={{
-                token: {
-                  colorPrimary: '#1890ff',
-                },
-              }}
-            >
-              <App />
-            </ConfigProvider>
+            <HttpTemplateProvider>
+              <ConfigProvider
+                theme={{
+                  token: {
+                    colorPrimary: '#1890ff',
+                  },
+                }}
+              >
+                <App />
+              </ConfigProvider>
+            </HttpTemplateProvider>
           </ChainProvider>
         </HistoryProvider>
       </KeyProvider>

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate, ChainStepType } from '../shared/types';
+import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate, ChainStepType, HttpTemplate } from '../shared/types';
 import { IPC_CHANNELS } from '../shared/constants';
 
 const electronAPI = {
@@ -91,6 +91,22 @@ const electronAPI = {
 
   getChainModules: (): Promise<Record<ChainStepType, { name: string; description: string; category: string; requiredParams?: string[] }>> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_CHAIN_MODULES),
+
+  // HTTP template operations
+  getHttpTemplates: (): Promise<HttpTemplate[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_HTTP_TEMPLATES),
+
+  saveHttpTemplate: (template: HttpTemplate): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SAVE_HTTP_TEMPLATE, template),
+
+  updateHttpTemplate: (template: HttpTemplate): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.UPDATE_HTTP_TEMPLATE, template),
+
+  deleteHttpTemplate: (templateId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_HTTP_TEMPLATE, templateId),
+
+  useHttpTemplate: (templateId: string, pathParams: Record<string, string>, queryParams: Record<string, string>): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.USE_HTTP_TEMPLATE, templateId, pathParams, queryParams),
 
   // 이벤트 리스너 제거
   removeUpdateListeners: () => {

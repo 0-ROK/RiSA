@@ -6,7 +6,7 @@ import * as forge from 'node-forge';
 import * as fs from 'fs';
 import { autoUpdater } from 'electron-updater';
 import type { UpdateInfo } from 'electron-updater/out/types';
-import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate } from '../shared/types';
+import { SavedKey, RSAKeyPair, EncryptionResult, HistoryItem, HistoryFilter, ChainStep, ChainExecutionResult, ChainTemplate, HttpTemplate } from '../shared/types';
 import { IPC_CHANNELS, CHAIN_MODULES, DEFAULT_CHAIN_TEMPLATES } from '../shared/constants';
 import { chainExecutor } from './chainExecutor';
 
@@ -15,6 +15,7 @@ interface StoreData {
   keys: SavedKey[];
   history: HistoryItem[];
   chainTemplates: ChainTemplate[];
+  httpTemplates: HttpTemplate[];
 }
 
 const store = new Store({
@@ -26,7 +27,8 @@ const store = new Store({
       steps: template.steps.map(step => ({ ...step })), // Make steps mutable
       tags: [...template.tags], // Make tags mutable
       created: new Date(),
-    })) as ChainTemplate[]
+    })) as ChainTemplate[],
+    httpTemplates: [] as HttpTemplate[]
   }
 });
 
@@ -632,4 +634,129 @@ ipcMain.handle(IPC_CHANNELS.DELETE_CHAIN_TEMPLATE, (_, templateId: string): void
 
 ipcMain.handle(IPC_CHANNELS.GET_CHAIN_MODULES, () => {
   return chainExecutor.getAvailableModules();
+});
+
+// === HTTP Template Operations ===
+
+// Get all HTTP templates
+ipcMain.handle(IPC_CHANNELS.GET_HTTP_TEMPLATES, (): HttpTemplate[] => {
+  return storeGet('httpTemplates', []);
+});
+
+// Save new HTTP template
+ipcMain.handle(IPC_CHANNELS.SAVE_HTTP_TEMPLATE, (_, template: HttpTemplate): void => {
+  const templates = storeGet('httpTemplates', []);
+
+  // Check if template with same ID already exists
+  const existingIndex = templates.findIndex(t => t.id === template.id);
+  if (existingIndex >= 0) {
+    throw new Error(`Template with ID ${template.id} already exists. Use update instead.`);
+  }
+
+  templates.push(template);
+  storeSet('httpTemplates', templates);
+});
+
+// Update existing HTTP template
+ipcMain.handle(IPC_CHANNELS.UPDATE_HTTP_TEMPLATE, (_, template: HttpTemplate): void => {
+  const templates = storeGet('httpTemplates', []);
+  const index = templates.findIndex(t => t.id === template.id);
+
+  if (index === -1) {
+    throw new Error(`Template with ID ${template.id} not found`);
+  }
+
+  templates[index] = template;
+  storeSet('httpTemplates', templates);
+});
+
+// Delete HTTP template
+ipcMain.handle(IPC_CHANNELS.DELETE_HTTP_TEMPLATE, (_, templateId: string): void => {
+  const templates = storeGet('httpTemplates', []);
+  const index = templates.findIndex(t => t.id === templateId);
+
+  if (index === -1) {
+    throw new Error(`Template with ID ${templateId} not found`);
+  }
+
+  templates.splice(index, 1);
+  storeSet('httpTemplates', templates);
+});
+
+// Use HTTP template to generate URL
+ipcMain.handle(IPC_CHANNELS.USE_HTTP_TEMPLATE, (_, templateId: string, pathParams: Record<string, string>, queryParams: Record<string, string>): string => {
+  const templates = storeGet('httpTemplates', []);
+  const template = templates.find(t => t.id === templateId);
+
+  if (!template) {
+    throw new Error(`Template with ID ${templateId} not found`);
+  }
+
+  try {
+    let fullUrl = template.baseUrl;
+
+    // Build path
+    if (template.pathTemplate) {
+      let pathPart = template.pathTemplate;
+
+      // Replace path parameters
+      Object.entries(pathParams).forEach(([key, value]) => {
+        pathPart = pathPart
+          .replace(`:${key}`, encodeURIComponent(value))
+          .replace(`{${key}}`, encodeURIComponent(value));
+      });
+
+      // Ensure proper URL joining
+      if (!fullUrl.endsWith('/') && !pathPart.startsWith('/')) {
+        fullUrl += '/';
+      }
+      if (fullUrl.endsWith('/') && pathPart.startsWith('/')) {
+        pathPart = pathPart.substring(1);
+      }
+
+      fullUrl += pathPart;
+    }
+
+    // Build query string
+    let queryString = '';
+
+    if (template.queryTemplate) {
+      try {
+        // Try to parse as JSON array first (new format)
+        const queryKeys = JSON.parse(template.queryTemplate);
+        if (Array.isArray(queryKeys)) {
+          // Array format: ["page", "limit"]
+          const queryParts: string[] = [];
+          queryKeys.forEach(key => {
+            const paramValue = queryParams[key];
+            if (paramValue && paramValue.trim() !== '') {
+              queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
+            }
+          });
+          queryString = queryParts.join('&');
+        }
+      } catch {
+        // If JSON parsing fails, treat as legacy format and skip
+        console.warn('Invalid query template format, skipping query parameters');
+      }
+    } else {
+      // No query template - use all query parameters
+      const queryEntries = Object.entries(queryParams).filter(([_, value]) => value.trim() !== '');
+      if (queryEntries.length > 0) {
+        const searchParams = new URLSearchParams();
+        queryEntries.forEach(([key, value]) => {
+          searchParams.set(key, value);
+        });
+        queryString = searchParams.toString();
+      }
+    }
+
+    if (queryString) {
+      fullUrl += `?${queryString}`;
+    }
+
+    return fullUrl;
+  } catch (error) {
+    throw new Error(`URL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 });
