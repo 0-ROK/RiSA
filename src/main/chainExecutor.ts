@@ -162,7 +162,9 @@ export class ChainExecutor {
       const url = new URL(input.trim());
       const pathTemplate = step.params?.pathTemplate || '';
       const queryTemplate = step.params?.queryTemplate || '';
-      const outputField = step.params?.outputField || 'full';
+      const outputType = step.params?.outputType || 'full';
+      const outputField = step.params?.outputField;
+      const outputParam = step.params?.outputParam;
 
       // Parse path parameters
       const pathParams: Record<string, string> = {};
@@ -213,16 +215,37 @@ export class ChainExecutor {
         });
       }
 
-      // Return specified output field
-      switch (outputField) {
-        case 'host':
-          return url.host;
-        case 'pathname':
-          return url.pathname;
-        case 'pathParams':
-          return JSON.stringify(pathParams);
-        case 'queryParams':
-          return JSON.stringify(queryParams);
+      // Return based on output type and field
+      switch (outputType) {
+        case 'component':
+          switch (outputField) {
+            case 'host':
+              return url.host;
+            case 'pathname':
+              return url.pathname;
+            default:
+              return url.host;
+          }
+
+        case 'pathParam':
+          if (outputField === 'specific' && outputParam) {
+            // Return specific path parameter value
+            return pathParams[outputParam] || '';
+          } else {
+            // Return all path parameters as JSON
+            return JSON.stringify(pathParams);
+          }
+
+        case 'queryParam':
+          if (outputField === 'specific' && outputParam) {
+            // Return specific query parameter value
+            const value = new URLSearchParams(url.search).get(outputParam);
+            return value || '';
+          } else {
+            // Return all query parameters as JSON
+            return JSON.stringify(queryParams);
+          }
+
         case 'full':
         default:
           return JSON.stringify({
@@ -245,89 +268,96 @@ export class ChainExecutor {
       const baseUrl = step.params?.baseUrl || '';
       const pathTemplate = step.params?.pathTemplate || '';
       const queryTemplate = step.params?.queryTemplate || '';
-      const inputMapping = step.params?.inputMapping || 'auto';
+      const paramMappings = step.params?.paramMappings || {};
+      const queryMappings = step.params?.queryMappings || {};
 
       if (!baseUrl) {
         throw new Error('Base URL is required for HTTP build');
       }
 
-      // Parse input based on mapping strategy
-      let pathParams: Record<string, string> = {};
-      let queryParams: Record<string, string> = {};
+      // Parse input data
+      let inputData: any = input;
+      try {
+        inputData = JSON.parse(input);
+      } catch {
+        // Keep as string if not JSON
+      }
 
-      if (inputMapping === 'auto') {
-        // Try to parse input as JSON
+      // Apply path parameter mappings
+      const pathParams: Record<string, string> = {};
+      if (pathTemplate) {
+        // Extract parameter names from template
+        const pathParamNames = (pathTemplate.match(/:(\w+)|\{(\w+)\}/g) || [])
+          .map(match => match.replace(/[:{}]/g, ''));
+
+        for (const paramName of pathParamNames) {
+          const mapping = paramMappings[paramName];
+          if (mapping) {
+            switch (mapping.type) {
+              case 'auto':
+                // Use entire input as parameter value
+                pathParams[paramName] = String(inputData);
+                break;
+              case 'field':
+                // Extract field from JSON input
+                if (mapping.value && mapping.value.startsWith('$.')) {
+                  const fieldName = mapping.value.substring(2);
+                  if (typeof inputData === 'object' && inputData !== null && fieldName in inputData) {
+                    pathParams[paramName] = String(inputData[fieldName]);
+                  }
+                }
+                break;
+              case 'fixed':
+                // Use fixed value
+                pathParams[paramName] = mapping.value || '';
+                break;
+              default:
+                // Default to auto mapping
+                pathParams[paramName] = String(inputData);
+            }
+          } else {
+            // Default behavior: use entire input
+            pathParams[paramName] = String(inputData);
+          }
+        }
+      }
+
+      // Apply query parameter mappings
+      const queryParams: Record<string, string> = {};
+      if (queryTemplate) {
         try {
-          const inputData = JSON.parse(input);
-          if (typeof inputData === 'object' && inputData !== null) {
-            pathParams = inputData;
-            queryParams = inputData;
+          const queryParamNames = JSON.parse(queryTemplate);
+          if (Array.isArray(queryParamNames)) {
+            for (const paramName of queryParamNames) {
+              const mapping = queryMappings[paramName];
+              if (mapping && mapping.type !== 'skip') {
+                switch (mapping.type) {
+                  case 'auto':
+                    // Use entire input as parameter value
+                    queryParams[paramName] = String(inputData);
+                    break;
+                  case 'field':
+                    // Extract field from JSON input
+                    if (mapping.value && mapping.value.startsWith('$.')) {
+                      const fieldName = mapping.value.substring(2);
+                      if (typeof inputData === 'object' && inputData !== null && fieldName in inputData) {
+                        queryParams[paramName] = String(inputData[fieldName]);
+                      }
+                    }
+                    break;
+                  case 'fixed':
+                    // Use fixed value
+                    queryParams[paramName] = mapping.value || '';
+                    break;
+                  default:
+                    // Default to auto mapping
+                    queryParams[paramName] = String(inputData);
+                }
+              }
+            }
           }
         } catch {
-          // If not JSON, treat as single value
-          throw new Error('Auto mapping requires JSON input');
-        }
-      } else if (inputMapping === 'pathParam') {
-        // Map input to specific path parameter using pathParamName
-        const paramName = step.params?.pathParamName;
-        if (!paramName) {
-          throw new Error('Path parameter name is required for pathParam mapping');
-        }
-        pathParams[paramName] = input;
-      } else if (inputMapping === 'queryParam') {
-        // Map input to specific query parameter using queryParamName
-        const paramName = step.params?.queryParamName;
-        if (!paramName) {
-          throw new Error('Query parameter name is required for queryParam mapping');
-        }
-        queryParams[paramName] = input;
-      } else if (inputMapping === 'json') {
-        // Parse input as full parameter object
-        const inputData = JSON.parse(input);
-        pathParams = inputData.pathParams || {};
-        queryParams = inputData.queryParams || {};
-      } else if (inputMapping === 'custom') {
-        // Use custom mapping from customMapping parameter
-        const customMapping = step.params?.customMapping;
-        if (!customMapping) {
-          throw new Error('Custom mapping configuration is required for custom mapping');
-        }
-
-        try {
-          const mappingConfig = JSON.parse(customMapping);
-          const inputData = JSON.parse(input);
-
-          // Apply path parameter mappings
-          if (mappingConfig.pathParams) {
-            Object.entries(mappingConfig.pathParams).forEach(([key, jsonPath]: [string, any]) => {
-              // Simple JSON path extraction (supports $.field syntax)
-              if (typeof jsonPath === 'string' && jsonPath.startsWith('$.')) {
-                const fieldName = jsonPath.substring(2);
-                if (inputData[fieldName] !== undefined) {
-                  pathParams[key] = String(inputData[fieldName]);
-                }
-              } else {
-                pathParams[key] = String(jsonPath);
-              }
-            });
-          }
-
-          // Apply query parameter mappings
-          if (mappingConfig.queryParams) {
-            Object.entries(mappingConfig.queryParams).forEach(([key, jsonPath]: [string, any]) => {
-              // Simple JSON path extraction (supports $.field syntax)
-              if (typeof jsonPath === 'string' && jsonPath.startsWith('$.')) {
-                const fieldName = jsonPath.substring(2);
-                if (inputData[fieldName] !== undefined) {
-                  queryParams[key] = String(inputData[fieldName]);
-                }
-              } else {
-                queryParams[key] = String(jsonPath);
-              }
-            });
-          }
-        } catch (error) {
-          throw new Error(`Custom mapping failed: ${error instanceof Error ? error.message : 'Invalid configuration'}`);
+          // Fallback: treat as all query parameters if template parsing fails
         }
       }
 
@@ -357,46 +387,13 @@ export class ChainExecutor {
       }
 
       // Build query string
-      let queryString = '';
-      if (queryTemplate) {
-        try {
-          // Parse query template as JSON array
-          const queryKeys = JSON.parse(queryTemplate);
-          if (Array.isArray(queryKeys)) {
-            const queryParts: string[] = [];
-            queryKeys.forEach(key => {
-              const paramValue = queryParams[key];
-              if (paramValue && paramValue.trim() !== '') {
-                queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
-              }
-            });
-            queryString = queryParts.join('&');
-          }
-        } catch {
-          // Fallback: use all query parameters
-          const queryEntries = Object.entries(queryParams).filter(([_, value]) => value.trim() !== '');
-          if (queryEntries.length > 0) {
-            const searchParams = new URLSearchParams();
-            queryEntries.forEach(([key, value]) => {
-              searchParams.set(key, value);
-            });
-            queryString = searchParams.toString();
-          }
-        }
-      } else {
-        // No template: use all query parameters
-        const queryEntries = Object.entries(queryParams).filter(([_, value]) => value.trim() !== '');
-        if (queryEntries.length > 0) {
-          const searchParams = new URLSearchParams();
-          queryEntries.forEach(([key, value]) => {
-            searchParams.set(key, value);
-          });
-          queryString = searchParams.toString();
-        }
-      }
-
-      if (queryString) {
-        fullUrl += `?${queryString}`;
+      const queryEntries = Object.entries(queryParams).filter(([_, value]) => value.trim() !== '');
+      if (queryEntries.length > 0) {
+        const searchParams = new URLSearchParams();
+        queryEntries.forEach(([key, value]) => {
+          searchParams.set(key, value);
+        });
+        fullUrl += `?${searchParams.toString()}`;
       }
 
       return fullUrl;

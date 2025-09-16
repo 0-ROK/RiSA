@@ -1,12 +1,11 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, Switch, Select, Button, Tooltip, Alert, Input, Typography } from 'antd';
+import { Card, Switch, Select, Button, Tooltip, Alert, Input, Typography, Radio, Space } from 'antd';
 import { DeleteOutlined, LockOutlined, UnlockOutlined, MenuOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { ChainStep, SavedKey, ChainStepResult, HttpTemplate } from '../../shared/types';
 import { CHAIN_MODULES } from '../../shared/constants';
 
-const { TextArea } = Input;
 const { Text } = Typography;
 
 interface SortableStepItemProps {
@@ -57,6 +56,24 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   const isSuccess = hasExecutionResult && executionResult.success;
   const isError = hasExecutionResult && !executionResult.success;
 
+  // 경로 템플릿에서 파라미터 추출
+  const extractPathParams = (pathTemplate: string): string[] => {
+    if (!pathTemplate) return [];
+    const matches = pathTemplate.match(/:(\w+)|\{(\w+)\}/g);
+    return matches ? matches.map(match => match.replace(/[:{}]/g, '')) : [];
+  };
+
+  // 쿼리 템플릿에서 파라미터 추출
+  const extractQueryParams = (queryTemplate: string): string[] => {
+    if (!queryTemplate) return [];
+    try {
+      const parsed = JSON.parse(queryTemplate);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
   // HTTP 템플릿 선택 핸들러
   const handleTemplateSelect = (templateId: string) => {
     const template = httpTemplates.find(t => t.id === templateId);
@@ -68,10 +85,17 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
           baseUrl: template.baseUrl,
           pathTemplate: template.pathTemplate,
           queryTemplate: template.queryTemplate,
+          // 출력 타입 초기화
+          outputType: step.params?.outputType || 'full',
         }
       });
     }
   };
+
+  // 현재 선택된 템플릿
+  const selectedTemplate = httpTemplates.find(t => t.id === step.params?.httpTemplateId);
+  const availablePathParams = selectedTemplate ? extractPathParams(selectedTemplate.pathTemplate) : [];
+  const availableQueryParams = selectedTemplate ? extractQueryParams(selectedTemplate.queryTemplate) : [];
 
   const getStepIcon = () => {
     switch (step.type) {
@@ -263,126 +287,313 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                 {/* HTTP Parse 설정 */}
                 {step.type === 'http-parse' && (
                   <div style={{ marginBottom: 8 }}>
-                    <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                      출력 필드:
+                    <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 6 }}>
+                      출력 선택:
                     </Text>
-                    <Select
-                      placeholder="출력할 필드 선택"
-                      value={step.params?.outputField}
-                      onChange={(value) => onUpdateStep(step.id, {
-                        params: { ...step.params, outputField: value }
+                    <Radio.Group
+                      value={step.params?.outputType || 'full'}
+                      onChange={(e) => onUpdateStep(step.id, {
+                        params: { ...step.params, outputType: e.target.value, outputField: undefined, outputParam: undefined }
                       })}
                       style={{ width: '100%' }}
                       size="small"
                     >
-                      <Select.Option value="full">전체 파싱 결과</Select.Option>
-                      <Select.Option value="host">호스트</Select.Option>
-                      <Select.Option value="pathname">경로</Select.Option>
-                      <Select.Option value="pathParams">경로 파라미터</Select.Option>
-                      <Select.Option value="queryParams">쿼리 파라미터</Select.Option>
-                    </Select>
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <Radio value="full">🔗 전체 파싱 결과 (JSON)</Radio>
+                        <Radio value="component">🌐 URL 구성요소</Radio>
+                        <Radio value="pathParam">🔑 경로 파라미터</Radio>
+                        <Radio value="queryParam">❓ 쿼리 파라미터</Radio>
+                      </Space>
+                    </Radio.Group>
+
+                    {/* URL 구성요소 선택 */}
+                    {step.params?.outputType === 'component' && (
+                      <div style={{ marginTop: 8, marginLeft: 20 }}>
+                        <Select
+                          placeholder="구성요소 선택"
+                          value={step.params?.outputField}
+                          onChange={(value) => onUpdateStep(step.id, {
+                            params: { ...step.params, outputField: value }
+                          })}
+                          style={{ width: '100%' }}
+                          size="small"
+                        >
+                          <Select.Option value="host">호스트 (예: api.github.com)</Select.Option>
+                          <Select.Option value="pathname">경로 (예: /repos/owner/repo)</Select.Option>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* 경로 파라미터 선택 */}
+                    {step.params?.outputType === 'pathParam' && (
+                      <div style={{ marginTop: 8, marginLeft: 20 }}>
+                        <Radio.Group
+                          value={step.params?.outputField || 'all'}
+                          onChange={(e) => onUpdateStep(step.id, {
+                            params: { ...step.params, outputField: e.target.value, outputParam: undefined }
+                          })}
+                          style={{ width: '100%' }}
+                          size="small"
+                        >
+                          <Space direction="vertical">
+                            <Radio value="all">모든 경로 파라미터 (JSON)</Radio>
+                            <Radio value="specific" disabled={availablePathParams.length === 0}>
+                              특정 파라미터 값
+                            </Radio>
+                          </Space>
+                        </Radio.Group>
+
+                        {step.params?.outputField === 'specific' && availablePathParams.length > 0 && (
+                          <div style={{ marginTop: 6, marginLeft: 20 }}>
+                            <Select
+                              placeholder="파라미터 선택"
+                              value={step.params?.outputParam}
+                              onChange={(value) => onUpdateStep(step.id, {
+                                params: { ...step.params, outputParam: value }
+                              })}
+                              style={{ width: '100%' }}
+                              size="small"
+                            >
+                              {availablePathParams.map(param => (
+                                <Select.Option key={param} value={param}>
+                                  {param}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 쿼리 파라미터 선택 */}
+                    {step.params?.outputType === 'queryParam' && (
+                      <div style={{ marginTop: 8, marginLeft: 20 }}>
+                        <Radio.Group
+                          value={step.params?.outputField || 'all'}
+                          onChange={(e) => onUpdateStep(step.id, {
+                            params: { ...step.params, outputField: e.target.value, outputParam: undefined }
+                          })}
+                          style={{ width: '100%' }}
+                          size="small"
+                        >
+                          <Space direction="vertical">
+                            <Radio value="all">모든 쿼리 파라미터 (JSON)</Radio>
+                            <Radio value="specific">특정 파라미터 값</Radio>
+                          </Space>
+                        </Radio.Group>
+
+                        {step.params?.outputField === 'specific' && (
+                          <div style={{ marginTop: 6, marginLeft: 20 }}>
+                            <Input
+                              placeholder="파라미터 이름 (예: page)"
+                              value={step.params?.outputParam || ''}
+                              onChange={(e) => onUpdateStep(step.id, {
+                                params: { ...step.params, outputParam: e.target.value }
+                              })}
+                              size="small"
+                            />
+                            {availableQueryParams.length > 0 && (
+                              <div style={{ marginTop: 4, fontSize: '11px', color: '#666' }}>
+                                템플릿 파라미터: {availableQueryParams.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* HTTP Build 설정 */}
                 {step.type === 'http-build' && (
                   <>
-                    <div style={{ marginBottom: 8 }}>
-                      <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                        베이스 URL:
-                      </Text>
-                      <Input
-                        placeholder="https://api.example.com"
-                        value={step.params?.baseUrl || ''}
-                        onChange={(e) => onUpdateStep(step.id, {
-                          params: { ...step.params, baseUrl: e.target.value }
-                        })}
-                        size="small"
-                      />
-                    </div>
-
-                    <div style={{ marginBottom: 8 }}>
-                      <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                        입력 매핑:
-                      </Text>
-                      <Select
-                        placeholder="입력 매핑 방식 선택"
-                        value={step.params?.inputMapping || 'auto'}
-                        onChange={(value) => onUpdateStep(step.id, {
-                          params: { ...step.params, inputMapping: value }
-                        })}
-                        style={{ width: '100%' }}
-                        size="small"
-                      >
-                        <Select.Option value="auto">자동 (JSON 파싱)</Select.Option>
-                        <Select.Option value="json">전체 매핑 객체</Select.Option>
-                        <Select.Option value="pathParam">특정 경로 파라미터</Select.Option>
-                        <Select.Option value="queryParam">특정 쿼리 파라미터</Select.Option>
-                      </Select>
-                    </div>
-
-                    {step.params?.inputMapping === 'pathParam' && (
+                    {/* 템플릿이 선택되지 않은 경우 직접 URL 입력 */}
+                    {!selectedTemplate && (
                       <div style={{ marginBottom: 8 }}>
                         <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                          경로 파라미터 이름:
+                          베이스 URL:
                         </Text>
                         <Input
-                          placeholder="userId"
-                          value={step.params?.pathParamName || ''}
+                          placeholder="https://api.example.com"
+                          value={step.params?.baseUrl || ''}
                           onChange={(e) => onUpdateStep(step.id, {
-                            params: { ...step.params, pathParamName: e.target.value }
+                            params: { ...step.params, baseUrl: e.target.value }
                           })}
                           size="small"
                         />
                       </div>
                     )}
 
-                    {step.params?.inputMapping === 'queryParam' && (
+                    {/* 템플릿이 선택된 경우 매핑 설정 */}
+                    {selectedTemplate && (
                       <div style={{ marginBottom: 8 }}>
                         <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                          쿼리 파라미터 이름:
+                          입력 매핑 설정:
                         </Text>
-                        <Input
-                          placeholder="page"
-                          value={step.params?.queryParamName || ''}
-                          onChange={(e) => onUpdateStep(step.id, {
-                            params: { ...step.params, queryParamName: e.target.value }
-                          })}
-                          size="small"
-                        />
+                        <div style={{
+                          backgroundColor: '#f8f9fa',
+                          padding: 8,
+                          borderRadius: 4,
+                          marginBottom: 8,
+                          fontSize: '11px',
+                          color: '#666'
+                        }}>
+                          템플릿: {selectedTemplate.name}<br/>
+                          URL: {selectedTemplate.baseUrl}{selectedTemplate.pathTemplate}
+                          {selectedTemplate.queryTemplate && ` (쿼리: ${selectedTemplate.queryTemplate})`}
+                        </div>
+
+                        {/* 경로 파라미터 매핑 */}
+                        {availablePathParams.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <Text strong style={{ fontSize: '11px', display: 'block', marginBottom: 4 }}>
+                              🔑 경로 파라미터:
+                            </Text>
+                            {availablePathParams.map(param => (
+                              <div key={param} style={{ marginBottom: 4 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ minWidth: 60, fontSize: '11px', fontWeight: 500 }}>
+                                    {param}:
+                                  </span>
+                                  <Select
+                                    placeholder="매핑 선택"
+                                    value={step.params?.paramMappings?.[param]?.type || 'auto'}
+                                    onChange={(value) => {
+                                      const paramMappings = { ...step.params?.paramMappings };
+                                      paramMappings[param] = { type: value };
+                                      onUpdateStep(step.id, {
+                                        params: { ...step.params, paramMappings }
+                                      });
+                                    }}
+                                    style={{ flex: 1 }}
+                                    size="small"
+                                  >
+                                    <Select.Option value="auto">🔄 이전 출력 전체</Select.Option>
+                                    <Select.Option value="field">📌 JSON 필드</Select.Option>
+                                    <Select.Option value="fixed">📎 고정 값</Select.Option>
+                                  </Select>
+                                </div>
+
+                                {step.params?.paramMappings?.[param]?.type === 'field' && (
+                                  <Input
+                                    placeholder="필드 경로 (예: $.id)"
+                                    value={step.params?.paramMappings?.[param]?.value || ''}
+                                    onChange={(e) => {
+                                      const paramMappings = { ...step.params?.paramMappings };
+                                      paramMappings[param] = {
+                                        ...paramMappings[param],
+                                        value: e.target.value
+                                      };
+                                      onUpdateStep(step.id, {
+                                        params: { ...step.params, paramMappings }
+                                      });
+                                    }}
+                                    size="small"
+                                    style={{ marginTop: 4, marginLeft: 68 }}
+                                  />
+                                )}
+
+                                {step.params?.paramMappings?.[param]?.type === 'fixed' && (
+                                  <Input
+                                    placeholder="고정 값"
+                                    value={step.params?.paramMappings?.[param]?.value || ''}
+                                    onChange={(e) => {
+                                      const paramMappings = { ...step.params?.paramMappings };
+                                      paramMappings[param] = {
+                                        ...paramMappings[param],
+                                        value: e.target.value
+                                      };
+                                      onUpdateStep(step.id, {
+                                        params: { ...step.params, paramMappings }
+                                      });
+                                    }}
+                                    size="small"
+                                    style={{ marginTop: 4, marginLeft: 68 }}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 쿼리 파라미터 매핑 */}
+                        {availableQueryParams.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <Text strong style={{ fontSize: '11px', display: 'block', marginBottom: 4 }}>
+                              ❓ 쿼리 파라미터:
+                            </Text>
+                            {availableQueryParams.map(param => (
+                              <div key={param} style={{ marginBottom: 4 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ minWidth: 60, fontSize: '11px', fontWeight: 500 }}>
+                                    {param}:
+                                  </span>
+                                  <Select
+                                    placeholder="매핑 선택"
+                                    value={step.params?.queryMappings?.[param]?.type || 'auto'}
+                                    onChange={(value) => {
+                                      const queryMappings = { ...step.params?.queryMappings };
+                                      queryMappings[param] = { type: value };
+                                      onUpdateStep(step.id, {
+                                        params: { ...step.params, queryMappings }
+                                      });
+                                    }}
+                                    style={{ flex: 1 }}
+                                    size="small"
+                                  >
+                                    <Select.Option value="auto">🔄 이전 출력 전체</Select.Option>
+                                    <Select.Option value="field">📌 JSON 필드</Select.Option>
+                                    <Select.Option value="fixed">📎 고정 값</Select.Option>
+                                    <Select.Option value="skip">⏭️ 생략</Select.Option>
+                                  </Select>
+                                </div>
+
+                                {step.params?.queryMappings?.[param]?.type === 'field' && (
+                                  <Input
+                                    placeholder="필드 경로 (예: $.page)"
+                                    value={step.params?.queryMappings?.[param]?.value || ''}
+                                    onChange={(e) => {
+                                      const queryMappings = { ...step.params?.queryMappings };
+                                      queryMappings[param] = {
+                                        ...queryMappings[param],
+                                        value: e.target.value
+                                      };
+                                      onUpdateStep(step.id, {
+                                        params: { ...step.params, queryMappings }
+                                      });
+                                    }}
+                                    size="small"
+                                    style={{ marginTop: 4, marginLeft: 68 }}
+                                  />
+                                )}
+
+                                {step.params?.queryMappings?.[param]?.type === 'fixed' && (
+                                  <Input
+                                    placeholder="고정 값"
+                                    value={step.params?.queryMappings?.[param]?.value || ''}
+                                    onChange={(e) => {
+                                      const queryMappings = { ...step.params?.queryMappings };
+                                      queryMappings[param] = {
+                                        ...queryMappings[param],
+                                        value: e.target.value
+                                      };
+                                      onUpdateStep(step.id, {
+                                        params: { ...step.params, queryMappings }
+                                      });
+                                    }}
+                                    size="small"
+                                    style={{ marginTop: 4, marginLeft: 68 }}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
                 )}
 
-                {/* 공통 템플릿 필드 */}
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                    경로 템플릿:
-                  </Text>
-                  <Input
-                    placeholder="/users/:userId/posts"
-                    value={step.params?.pathTemplate || ''}
-                    onChange={(e) => onUpdateStep(step.id, {
-                      params: { ...step.params, pathTemplate: e.target.value }
-                    })}
-                    size="small"
-                  />
-                </div>
-
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
-                    쿼리 템플릿:
-                  </Text>
-                  <Input
-                    placeholder='["page", "limit"]'
-                    value={step.params?.queryTemplate || ''}
-                    onChange={(e) => onUpdateStep(step.id, {
-                      params: { ...step.params, queryTemplate: e.target.value }
-                    })}
-                    size="small"
-                  />
-                </div>
               </div>
             )}
 
