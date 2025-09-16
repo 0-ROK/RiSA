@@ -16,8 +16,10 @@ RiSA is an Electron-based desktop application for RSA encryption and decryption 
 ### Key Components
 - **Settings Management**: Uses `electron-store` for persistent settings with GUI configuration panel
 - **RSA Operations**: Implemented using `node-rsa` library in the main process
+- **Chain Builder**: Sequential operation system for complex workflows (encoding, encryption, HTTP parsing)
+- **HTTP Parser**: URL template-based parsing and building with reusable templates
 - **IPC Communication**: Defined channels in `src/shared/constants.ts` for secure process communication
-- **State Management**: React Context API for settings state across the renderer process
+- **State Management**: React Context API for settings, chains, keys, history, and HTTP templates
 
 ### Project Structure
 ```
@@ -34,29 +36,34 @@ src/
 
 ### Prerequisites
 - Uses `pnpm` as package manager
-- Requires Node.js and Electron dependencies
+- Node.js 18+ and Electron dependencies required
 
 ### Building and Development
 ```bash
 # Install dependencies
 pnpm install
 
-# Development mode (needs to be set up)
-NODE_ENV=development pnpm run dev
+# Development mode (runs both main and renderer processes)
+pnpm run dev
 
-# Build for production
+# Build for production (builds main, renderer, and preload)
 pnpm run build
 
-# TypeScript compilation
+# Build individual components
+pnpm run build:main      # Main process only
+pnpm run build:renderer  # Renderer process only
+pnpm run build:preload   # Preload script only
+
+# Run built application
+pnpm run start
+
+# Package for distribution
+pnpm run package        # All platforms
+pnpm run package:mac    # macOS only
+
+# TypeScript type checking
 pnpm exec tsc --noEmit
 ```
-
-### Current Development Status
-The project is in early development with basic structure set up. Missing components include:
-- Build scripts in package.json
-- Settings page implementation
-- Key manager page implementation
-- Webpack build configuration for both main and renderer processes
 
 ## Technical Notes
 
@@ -69,7 +76,10 @@ The project is in early development with basic structure set up. Missing compone
 All communication between main and renderer processes goes through predefined IPC channels defined in `src/shared/constants.ts`. The main process handles:
 - Settings persistence via electron-store
 - RSA key generation and cryptographic operations
+- Chain execution via `chainExecutor.ts` (URL encoding, Base64, RSA, HTTP parsing/building)
+- HTTP template management and URL parsing/building
 - File system operations (folder/file selection)
+- History tracking for all operations
 - Settings import/export functionality
 
 ### Security Considerations
@@ -84,15 +94,28 @@ Uses Ant Design components with:
 - Theme support (light/dark mode)
 - React Router for page navigation
 
-## Known Issues
+## Feature Areas
 
-### Current TypeScript Errors
-- `electron-store` usage needs proper typing
-- Missing CSS loader dependencies for webpack
-- Build scripts not configured in package.json
+### Implemented Features
+- RSA encryption/decryption with multiple key sizes and algorithms
+- Key generation and management with import/export
+- Chain Builder for sequential operations
+- HTTP Parser with template-based URL parsing and building
+- Base64 and URL encoding/decoding tools
+- Operation history with filtering
+- Auto-update system for macOS
 
-### Missing Implementation
-- Settings page UI and functionality
-- Key manager page
-- File encryption/decryption features
-- Proper webpack dev server setup
+### Chain Builder Operations
+The Chain Builder (`ChainBuilderPage.tsx`) supports sequential operations with input/output mapping:
+- URL encoding/decoding
+- Base64 encoding/decoding
+- RSA encryption/decryption
+- HTTP parsing (extract path/query parameters from URLs)
+- HTTP building (construct URLs from templates and parameters)
+
+### HTTP Templates
+HTTP templates (`HttpTemplateContext.tsx`) enable reusable URL patterns:
+- Path parameters using `:param` or `{param}` syntax
+- Query parameters with validation patterns
+- Template-based parsing and building in Chain Builder
+- Input/output field mapping for chain operations
