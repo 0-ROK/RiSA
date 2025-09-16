@@ -25,15 +25,7 @@ import {
   PlusOutlined,
   DeleteOutlined,
   CopyOutlined,
-  BulbOutlined,
-  SettingOutlined,
-  LinkOutlined,
-  LockOutlined,
-  UnlockOutlined,
-  CodeOutlined,
-  CheckOutlined,
-  DragOutlined,
-  ApiOutlined
+  BulbOutlined
 } from '@ant-design/icons';
 import {
   DndContext,
@@ -52,289 +44,20 @@ import {
 import { useChain } from '../store/ChainContext';
 import { useKeys } from '../store/KeyContext';
 import { useHistory } from '../store/HistoryContext';
+import { useHttpTemplate } from '../store/HttpTemplateContext';
 import { ChainStep, ChainTemplate, ChainStepType, HistoryItem } from '../../shared/types';
-import { CHAIN_MODULES } from '../../shared/constants';
 import { SortableStepItem } from '../components/SortableStepItem';
 import PageHeader from '../components/PageHeader';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 const { TextArea } = Input;
-const { Option } = Select;
 
-interface StepCardProps {
-  step: ChainStep;
-  index: number;
-  onUpdate: (step: ChainStep) => void;
-  onDelete: () => void;
-  availableKeys: Array<{ id: string; name: string; keySize: number }>;
-}
-
-const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, availableKeys }) => {
-  const [showParams, setShowParams] = useState(false);
-  const moduleInfo = CHAIN_MODULES[step.type];
-
-  const getStepIcon = (type: ChainStepType) => {
-    switch (type) {
-      case 'url-encode':
-      case 'url-decode':
-        return <LinkOutlined />;
-      case 'rsa-encrypt':
-        return <LockOutlined />;
-      case 'rsa-decrypt':
-        return <UnlockOutlined />;
-      case 'base64-encode':
-      case 'base64-decode':
-        return <CodeOutlined />;
-      case 'http-parse':
-        return <ApiOutlined />;
-      case 'http-build':
-        return <LinkOutlined />;
-      default:
-        return <SettingOutlined />;
-    }
-  };
-
-  const getStepColor = (type: ChainStepType) => {
-    switch (type) {
-      case 'url-encode':
-      case 'url-decode':
-        return '#722ed1';
-      case 'rsa-encrypt':
-      case 'rsa-decrypt':
-        return '#f5222d';
-      case 'base64-encode':
-      case 'base64-decode':
-        return '#13c2c2';
-      case 'http-parse':
-      case 'http-build':
-        return '#fa8c16';
-      default:
-        return '#666';
-    }
-  };
-
-  const handleToggleEnabled = () => {
-    onUpdate({ ...step, enabled: !step.enabled });
-  };
-
-  const handleParamChange = (param: string, value: any) => {
-    const newParams = { ...step.params, [param]: value };
-    onUpdate({ ...step, params: newParams });
-  };
-
-  const needsKeySelection = step.type === 'rsa-encrypt' || step.type === 'rsa-decrypt';
-  const needsHttpConfig = step.type === 'http-parse' || step.type === 'http-build';
-
-  return (
-    <div style={{ opacity: step.enabled ? 1 : 0.5 }}>
-      <Card
-        size="small"
-        style={{
-          marginBottom: 8,
-          borderColor: getStepColor(step.type),
-          borderWidth: step.enabled ? 2 : 1,
-          backgroundColor: 'white',
-        }}
-        actions={[
-          <Tooltip title={step.enabled ? '비활성화' : '활성화'} key="toggle">
-            <Button
-              type="text"
-              icon={<CheckOutlined style={{ color: step.enabled ? '#52c41a' : '#d9d9d9' }} />}
-              onClick={handleToggleEnabled}
-            />
-          </Tooltip>,
-          <Tooltip title="설정" key="settings">
-            <Button
-              type="text"
-              icon={<SettingOutlined />}
-              onClick={() => setShowParams(!showParams)}
-            />
-          </Tooltip>,
-          <Tooltip title="삭제" key="delete">
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={onDelete}
-            />
-          </Tooltip>,
-        ]}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ marginRight: 8 }}>
-            <DragOutlined style={{ color: '#999' }} />
-          </div>
-          <div style={{ color: getStepColor(step.type), marginRight: 8 }}>
-            {getStepIcon(step.type)}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
-              {index + 1}. {moduleInfo?.name || step.type}
-              {/* RSA 스텝에서 키가 선택되지 않은 경우 경고 표시 */}
-              {needsKeySelection && (!step.params || !step.params.keyId) && (
-                <Tooltip title="키를 선택해주세요">
-                  <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
-                </Tooltip>
-              )}
-              {/* HTTP 스텝에서 필수 파라미터가 없는 경우 경고 표시 */}
-              {needsHttpConfig && step.type === 'http-parse' && (!step.params || !step.params.outputField) && (
-                <Tooltip title="출력 필드를 선택해주세요">
-                  <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
-                </Tooltip>
-              )}
-              {needsHttpConfig && step.type === 'http-build' && (!step.params || !step.params.baseUrl) && (
-                <Tooltip title="베이스 URL을 입력해주세요">
-                  <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
-                </Tooltip>
-              )}
-            </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {moduleInfo?.description || ''}
-              {needsKeySelection && step.params?.keyId && (
-                <span style={{ color: '#52c41a', marginLeft: 8 }}>✓ 키 선택됨</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {showParams && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
-            {needsKeySelection && (
-              <div style={{ marginBottom: 8 }}>
-                <Text strong>키 선택:</Text>
-                <Select
-                  style={{ width: '100%', marginTop: 4 }}
-                  placeholder="키를 선택하세요"
-                  value={step.params?.keyId}
-                  onChange={(value) => handleParamChange('keyId', value)}
-                >
-                  {availableKeys.map(key => (
-                    <Option key={key.id} value={key.id}>
-                      {key.name} ({key.keySize} bits)
-                    </Option>
-                  ))}
-                </Select>
-              </div>
-            )}
-
-            {needsKeySelection && (
-              <div style={{ marginBottom: 8 }}>
-                <Text strong>알고리즘:</Text>
-                <Select
-                  style={{ width: '100%', marginTop: 4 }}
-                  value={step.params?.algorithm || 'RSA-OAEP'}
-                  onChange={(value) => handleParamChange('algorithm', value)}
-                >
-                  <Option value="RSA-OAEP">RSA-OAEP (권장)</Option>
-                  <Option value="RSA-PKCS1">RSA-PKCS1</Option>
-                </Select>
-              </div>
-            )}
-
-            {/* HTTP 파싱 설정 */}
-            {step.type === 'http-parse' && (
-              <>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>출력 필드:</Text>
-                  <Select
-                    style={{ width: '100%', marginTop: 4 }}
-                    placeholder="출력할 필드를 선택하세요"
-                    value={step.params?.outputField}
-                    onChange={(value) => handleParamChange('outputField', value)}
-                  >
-                    <Option value="full">전체 파싱 결과 (JSON)</Option>
-                    <Option value="host">호스트</Option>
-                    <Option value="pathname">경로</Option>
-                    <Option value="pathParams">경로 파라미터 (JSON)</Option>
-                    <Option value="queryParams">쿼리 파라미터 (JSON)</Option>
-                  </Select>
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>경로 템플릿 (선택사항):</Text>
-                  <Input
-                    style={{ marginTop: 4 }}
-                    placeholder="/users/:userId/posts"
-                    value={step.params?.pathTemplate || ''}
-                    onChange={(e) => handleParamChange('pathTemplate', e.target.value)}
-                  />
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>쿼리 템플릿 (선택사항):</Text>
-                  <Input
-                    style={{ marginTop: 4 }}
-                    placeholder='["page", "limit"]'
-                    value={step.params?.queryTemplate || ''}
-                    onChange={(e) => handleParamChange('queryTemplate', e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* HTTP 생성 설정 */}
-            {step.type === 'http-build' && (
-              <>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>베이스 URL:</Text>
-                  <Input
-                    style={{ marginTop: 4 }}
-                    placeholder="https://api.example.com"
-                    value={step.params?.baseUrl || ''}
-                    onChange={(e) => handleParamChange('baseUrl', e.target.value)}
-                  />
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>입력 매핑:</Text>
-                  <Select
-                    style={{ width: '100%', marginTop: 4 }}
-                    placeholder="입력을 어떻게 매핑할지 선택하세요"
-                    value={step.params?.inputMapping || 'auto'}
-                    onChange={(value) => handleParamChange('inputMapping', value)}
-                  >
-                    <Option value="auto">자동 (JSON 파싱)</Option>
-                    <Option value="json">전체 매핑 객체</Option>
-                  </Select>
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>경로 템플릿 (선택사항):</Text>
-                  <Input
-                    style={{ marginTop: 4 }}
-                    placeholder="/users/:userId/posts"
-                    value={step.params?.pathTemplate || ''}
-                    onChange={(e) => handleParamChange('pathTemplate', e.target.value)}
-                  />
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>쿼리 템플릿 (선택사항):</Text>
-                  <Input
-                    style={{ marginTop: 4 }}
-                    placeholder='["page", "limit"]'
-                    value={step.params?.queryTemplate || ''}
-                    onChange={(e) => handleParamChange('queryTemplate', e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <Text strong>사용자 정의 이름:</Text>
-              <Input
-                style={{ marginTop: 4 }}
-                placeholder={moduleInfo?.name || step.type}
-                value={step.name}
-                onChange={(e) => onUpdate({ ...step, name: e.target.value })}
-              />
-            </div>
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-};
 
 const ChainBuilderPage: React.FC = () => {
   const { templates, loading, saveTemplate, deleteTemplate, executeChain, createEmptyTemplate, createEmptyStep, validateChainSteps } = useChain();
   const { keys } = useKeys();
   const { saveHistoryItem } = useHistory();
+  const { templates: httpTemplates } = useHttpTemplate();
 
   const [currentTemplate, setCurrentTemplate] = useState<ChainTemplate | null>(null);
   const [inputText, setInputText] = useState('');
@@ -359,11 +82,6 @@ const ChainBuilderPage: React.FC = () => {
     }
   }, [templates, currentTemplate]);
 
-  const availableKeys = keys.map(key => ({
-    id: key.id,
-    name: key.name,
-    keySize: key.keySize,
-  }));
 
   const handleCreateNewTemplate = () => {
     const newTemplate = createEmptyTemplate();
@@ -693,6 +411,7 @@ const ChainBuilderPage: React.FC = () => {
                             step={step}
                             index={index}
                             savedKeys={keys}
+                            httpTemplates={httpTemplates}
                             onToggle={handleToggleStep}
                             onDelete={handleDeleteStep}
                             onUpdateStep={handleUpdateStepParams}

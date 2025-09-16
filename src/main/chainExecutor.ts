@@ -267,19 +267,68 @@ export class ChainExecutor {
           // If not JSON, treat as single value
           throw new Error('Auto mapping requires JSON input');
         }
-      } else if (inputMapping.startsWith('pathParam.')) {
-        // Map input to specific path parameter
-        const paramName = inputMapping.substring(10);
+      } else if (inputMapping === 'pathParam') {
+        // Map input to specific path parameter using pathParamName
+        const paramName = step.params?.pathParamName;
+        if (!paramName) {
+          throw new Error('Path parameter name is required for pathParam mapping');
+        }
         pathParams[paramName] = input;
-      } else if (inputMapping.startsWith('queryParam.')) {
-        // Map input to specific query parameter
-        const paramName = inputMapping.substring(11);
+      } else if (inputMapping === 'queryParam') {
+        // Map input to specific query parameter using queryParamName
+        const paramName = step.params?.queryParamName;
+        if (!paramName) {
+          throw new Error('Query parameter name is required for queryParam mapping');
+        }
         queryParams[paramName] = input;
       } else if (inputMapping === 'json') {
         // Parse input as full parameter object
         const inputData = JSON.parse(input);
         pathParams = inputData.pathParams || {};
         queryParams = inputData.queryParams || {};
+      } else if (inputMapping === 'custom') {
+        // Use custom mapping from customMapping parameter
+        const customMapping = step.params?.customMapping;
+        if (!customMapping) {
+          throw new Error('Custom mapping configuration is required for custom mapping');
+        }
+
+        try {
+          const mappingConfig = JSON.parse(customMapping);
+          const inputData = JSON.parse(input);
+
+          // Apply path parameter mappings
+          if (mappingConfig.pathParams) {
+            Object.entries(mappingConfig.pathParams).forEach(([key, jsonPath]: [string, any]) => {
+              // Simple JSON path extraction (supports $.field syntax)
+              if (typeof jsonPath === 'string' && jsonPath.startsWith('$.')) {
+                const fieldName = jsonPath.substring(2);
+                if (inputData[fieldName] !== undefined) {
+                  pathParams[key] = String(inputData[fieldName]);
+                }
+              } else {
+                pathParams[key] = String(jsonPath);
+              }
+            });
+          }
+
+          // Apply query parameter mappings
+          if (mappingConfig.queryParams) {
+            Object.entries(mappingConfig.queryParams).forEach(([key, jsonPath]: [string, any]) => {
+              // Simple JSON path extraction (supports $.field syntax)
+              if (typeof jsonPath === 'string' && jsonPath.startsWith('$.')) {
+                const fieldName = jsonPath.substring(2);
+                if (inputData[fieldName] !== undefined) {
+                  queryParams[key] = String(inputData[fieldName]);
+                }
+              } else {
+                queryParams[key] = String(jsonPath);
+              }
+            });
+          }
+        } catch (error) {
+          throw new Error(`Custom mapping failed: ${error instanceof Error ? error.message : 'Invalid configuration'}`);
+        }
       }
 
       // Build URL

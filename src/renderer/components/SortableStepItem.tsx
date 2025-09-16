@@ -1,15 +1,19 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, Switch, Select, Button, Tooltip, Alert } from 'antd';
+import { Card, Switch, Select, Button, Tooltip, Alert, Input, Typography } from 'antd';
 import { DeleteOutlined, LockOutlined, UnlockOutlined, MenuOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { ChainStep, SavedKey, ChainStepResult } from '../../shared/types';
+import { ChainStep, SavedKey, ChainStepResult, HttpTemplate } from '../../shared/types';
 import { CHAIN_MODULES } from '../../shared/constants';
+
+const { TextArea } = Input;
+const { Text } = Typography;
 
 interface SortableStepItemProps {
   step: ChainStep;
   index: number;
   savedKeys: SavedKey[];
+  httpTemplates?: HttpTemplate[];
   onToggle: (stepId: string) => void;
   onDelete: (stepId: string) => void;
   onUpdateStep: (stepId: string, updates: Partial<ChainStep>) => void;
@@ -20,6 +24,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   step,
   index,
   savedKeys,
+  httpTemplates = [],
   onToggle,
   onDelete,
   onUpdateStep,
@@ -43,6 +48,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
 
   const moduleInfo = CHAIN_MODULES[step.type];
   const needsKeySelection = step.type === 'rsa-encrypt' || step.type === 'rsa-decrypt';
+  const needsHttpConfig = step.type === 'http-parse' || step.type === 'http-build';
   const hasValidKey = needsKeySelection && step.params?.keyId;
   const hasWarning = needsKeySelection && (!step.params || !step.params.keyId);
   
@@ -50,6 +56,22 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   const hasExecutionResult = executionResult && executionResult.stepId === step.id;
   const isSuccess = hasExecutionResult && executionResult.success;
   const isError = hasExecutionResult && !executionResult.success;
+
+  // HTTP 템플릿 선택 핸들러
+  const handleTemplateSelect = (templateId: string) => {
+    const template = httpTemplates.find(t => t.id === templateId);
+    if (template) {
+      onUpdateStep(step.id, {
+        params: {
+          ...step.params,
+          httpTemplateId: templateId,
+          baseUrl: template.baseUrl,
+          pathTemplate: template.pathTemplate,
+          queryTemplate: template.queryTemplate,
+        }
+      });
+    }
+  };
 
   const getStepIcon = () => {
     switch (step.type) {
@@ -211,6 +233,156 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                     </Select>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* HTTP 설정 */}
+            {needsHttpConfig && (
+              <div style={{ marginTop: 8, width: '100%' }}>
+                {/* 템플릿 선택 */}
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                    템플릿 선택:
+                  </Text>
+                  <Select
+                    placeholder="HTTP 템플릿 선택"
+                    value={step.params?.httpTemplateId}
+                    onChange={handleTemplateSelect}
+                    style={{ width: '100%' }}
+                    size="small"
+                    allowClear
+                  >
+                    {httpTemplates.map(template => (
+                      <Select.Option key={template.id} value={template.id}>
+                        {template.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* HTTP Parse 설정 */}
+                {step.type === 'http-parse' && (
+                  <div style={{ marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                      출력 필드:
+                    </Text>
+                    <Select
+                      placeholder="출력할 필드 선택"
+                      value={step.params?.outputField}
+                      onChange={(value) => onUpdateStep(step.id, {
+                        params: { ...step.params, outputField: value }
+                      })}
+                      style={{ width: '100%' }}
+                      size="small"
+                    >
+                      <Select.Option value="full">전체 파싱 결과</Select.Option>
+                      <Select.Option value="host">호스트</Select.Option>
+                      <Select.Option value="pathname">경로</Select.Option>
+                      <Select.Option value="pathParams">경로 파라미터</Select.Option>
+                      <Select.Option value="queryParams">쿼리 파라미터</Select.Option>
+                    </Select>
+                  </div>
+                )}
+
+                {/* HTTP Build 설정 */}
+                {step.type === 'http-build' && (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                        베이스 URL:
+                      </Text>
+                      <Input
+                        placeholder="https://api.example.com"
+                        value={step.params?.baseUrl || ''}
+                        onChange={(e) => onUpdateStep(step.id, {
+                          params: { ...step.params, baseUrl: e.target.value }
+                        })}
+                        size="small"
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                        입력 매핑:
+                      </Text>
+                      <Select
+                        placeholder="입력 매핑 방식 선택"
+                        value={step.params?.inputMapping || 'auto'}
+                        onChange={(value) => onUpdateStep(step.id, {
+                          params: { ...step.params, inputMapping: value }
+                        })}
+                        style={{ width: '100%' }}
+                        size="small"
+                      >
+                        <Select.Option value="auto">자동 (JSON 파싱)</Select.Option>
+                        <Select.Option value="json">전체 매핑 객체</Select.Option>
+                        <Select.Option value="pathParam">특정 경로 파라미터</Select.Option>
+                        <Select.Option value="queryParam">특정 쿼리 파라미터</Select.Option>
+                      </Select>
+                    </div>
+
+                    {step.params?.inputMapping === 'pathParam' && (
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                          경로 파라미터 이름:
+                        </Text>
+                        <Input
+                          placeholder="userId"
+                          value={step.params?.pathParamName || ''}
+                          onChange={(e) => onUpdateStep(step.id, {
+                            params: { ...step.params, pathParamName: e.target.value }
+                          })}
+                          size="small"
+                        />
+                      </div>
+                    )}
+
+                    {step.params?.inputMapping === 'queryParam' && (
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                          쿼리 파라미터 이름:
+                        </Text>
+                        <Input
+                          placeholder="page"
+                          value={step.params?.queryParamName || ''}
+                          onChange={(e) => onUpdateStep(step.id, {
+                            params: { ...step.params, queryParamName: e.target.value }
+                          })}
+                          size="small"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 공통 템플릿 필드 */}
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                    경로 템플릿:
+                  </Text>
+                  <Input
+                    placeholder="/users/:userId/posts"
+                    value={step.params?.pathTemplate || ''}
+                    onChange={(e) => onUpdateStep(step.id, {
+                      params: { ...step.params, pathTemplate: e.target.value }
+                    })}
+                    size="small"
+                  />
+                </div>
+
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                    쿼리 템플릿:
+                  </Text>
+                  <Input
+                    placeholder='["page", "limit"]'
+                    value={step.params?.queryTemplate || ''}
+                    onChange={(e) => onUpdateStep(step.id, {
+                      params: { ...step.params, queryTemplate: e.target.value }
+                    })}
+                    size="small"
+                  />
+                </div>
               </div>
             )}
 
