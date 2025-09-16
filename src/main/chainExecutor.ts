@@ -62,6 +62,14 @@ export class ChainExecutor {
           output = await this.rsaDecrypt(input, step);
           break;
 
+        case 'http-parse':
+          output = await this.httpParse(input, step);
+          break;
+
+        case 'http-build':
+          output = await this.httpBuild(input, step);
+          break;
+
         default:
           throw new Error(`Unsupported step type: ${step.type}`);
       }
@@ -146,6 +154,205 @@ export class ChainExecutor {
       return decrypted;
     } catch (error) {
       throw new Error(`RSA decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private async httpParse(input: string, step: ChainStep): Promise<string> {
+    try {
+      const url = new URL(input.trim());
+      const pathTemplate = step.params?.pathTemplate || '';
+      const queryTemplate = step.params?.queryTemplate || '';
+      const outputField = step.params?.outputField || 'full';
+
+      // Parse path parameters
+      const pathParams: Record<string, string> = {};
+      if (pathTemplate) {
+        const templateParts = pathTemplate.split('/').filter(part => part);
+        const urlParts = url.pathname.split('/').filter(part => part);
+
+        templateParts.forEach((templatePart, index) => {
+          if (templatePart.startsWith(':')) {
+            const paramName = templatePart.substring(1);
+            if (urlParts[index]) {
+              pathParams[paramName] = decodeURIComponent(urlParts[index]);
+            }
+          } else if (templatePart.startsWith('{') && templatePart.endsWith('}')) {
+            const paramName = templatePart.slice(1, -1);
+            if (urlParts[index]) {
+              pathParams[paramName] = decodeURIComponent(urlParts[index]);
+            }
+          }
+        });
+      }
+
+      // Parse query parameters
+      const queryParams: Record<string, string> = {};
+      if (queryTemplate) {
+        try {
+          // Parse query template as JSON array
+          const queryKeys = JSON.parse(queryTemplate);
+          if (Array.isArray(queryKeys)) {
+            const urlParams = new URLSearchParams(url.search);
+            queryKeys.forEach(key => {
+              const value = urlParams.get(key);
+              if (value !== null) {
+                queryParams[key] = value;
+              }
+            });
+          }
+        } catch {
+          // Fallback: get all query parameters
+          url.searchParams.forEach((value, key) => {
+            queryParams[key] = value;
+          });
+        }
+      } else {
+        // No template: get all query parameters
+        url.searchParams.forEach((value, key) => {
+          queryParams[key] = value;
+        });
+      }
+
+      // Return specified output field
+      switch (outputField) {
+        case 'host':
+          return url.host;
+        case 'pathname':
+          return url.pathname;
+        case 'pathParams':
+          return JSON.stringify(pathParams);
+        case 'queryParams':
+          return JSON.stringify(queryParams);
+        case 'full':
+        default:
+          return JSON.stringify({
+            protocol: url.protocol,
+            host: url.host,
+            pathname: url.pathname,
+            search: url.search,
+            hash: url.hash,
+            pathParams,
+            queryParams
+          });
+      }
+    } catch (error) {
+      throw new Error(`HTTP parsing failed: ${error instanceof Error ? error.message : 'Invalid URL'}`);
+    }
+  }
+
+  private async httpBuild(input: string, step: ChainStep): Promise<string> {
+    try {
+      const baseUrl = step.params?.baseUrl || '';
+      const pathTemplate = step.params?.pathTemplate || '';
+      const queryTemplate = step.params?.queryTemplate || '';
+      const inputMapping = step.params?.inputMapping || 'auto';
+
+      if (!baseUrl) {
+        throw new Error('Base URL is required for HTTP build');
+      }
+
+      // Parse input based on mapping strategy
+      let pathParams: Record<string, string> = {};
+      let queryParams: Record<string, string> = {};
+
+      if (inputMapping === 'auto') {
+        // Try to parse input as JSON
+        try {
+          const inputData = JSON.parse(input);
+          if (typeof inputData === 'object' && inputData !== null) {
+            pathParams = inputData;
+            queryParams = inputData;
+          }
+        } catch {
+          // If not JSON, treat as single value
+          throw new Error('Auto mapping requires JSON input');
+        }
+      } else if (inputMapping.startsWith('pathParam.')) {
+        // Map input to specific path parameter
+        const paramName = inputMapping.substring(10);
+        pathParams[paramName] = input;
+      } else if (inputMapping.startsWith('queryParam.')) {
+        // Map input to specific query parameter
+        const paramName = inputMapping.substring(11);
+        queryParams[paramName] = input;
+      } else if (inputMapping === 'json') {
+        // Parse input as full parameter object
+        const inputData = JSON.parse(input);
+        pathParams = inputData.pathParams || {};
+        queryParams = inputData.queryParams || {};
+      }
+
+      // Build URL
+      let fullUrl = baseUrl;
+
+      // Build path
+      if (pathTemplate) {
+        let pathPart = pathTemplate;
+
+        // Replace path parameters
+        Object.entries(pathParams).forEach(([key, value]) => {
+          pathPart = pathPart
+            .replace(`:${key}`, encodeURIComponent(value))
+            .replace(`{${key}}`, encodeURIComponent(value));
+        });
+
+        // Ensure proper URL joining
+        if (!fullUrl.endsWith('/') && !pathPart.startsWith('/')) {
+          fullUrl += '/';
+        }
+        if (fullUrl.endsWith('/') && pathPart.startsWith('/')) {
+          pathPart = pathPart.substring(1);
+        }
+
+        fullUrl += pathPart;
+      }
+
+      // Build query string
+      let queryString = '';
+      if (queryTemplate) {
+        try {
+          // Parse query template as JSON array
+          const queryKeys = JSON.parse(queryTemplate);
+          if (Array.isArray(queryKeys)) {
+            const queryParts: string[] = [];
+            queryKeys.forEach(key => {
+              const paramValue = queryParams[key];
+              if (paramValue && paramValue.trim() !== '') {
+                queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(paramValue)}`);
+              }
+            });
+            queryString = queryParts.join('&');
+          }
+        } catch {
+          // Fallback: use all query parameters
+          const queryEntries = Object.entries(queryParams).filter(([_, value]) => value.trim() !== '');
+          if (queryEntries.length > 0) {
+            const searchParams = new URLSearchParams();
+            queryEntries.forEach(([key, value]) => {
+              searchParams.set(key, value);
+            });
+            queryString = searchParams.toString();
+          }
+        }
+      } else {
+        // No template: use all query parameters
+        const queryEntries = Object.entries(queryParams).filter(([_, value]) => value.trim() !== '');
+        if (queryEntries.length > 0) {
+          const searchParams = new URLSearchParams();
+          queryEntries.forEach(([key, value]) => {
+            searchParams.set(key, value);
+          });
+          queryString = searchParams.toString();
+        }
+      }
+
+      if (queryString) {
+        fullUrl += `?${queryString}`;
+      }
+
+      return fullUrl;
+    } catch (error) {
+      throw new Error(`HTTP build failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -257,6 +464,18 @@ export class ChainExecutor {
         description: 'RSA 개인키로 복호화합니다',
         category: 'crypto',
         requiredParams: ['keyId'],
+      },
+      'http-parse': {
+        name: 'HTTP 파싱',
+        description: 'URL을 분석하여 구성 요소를 추출합니다',
+        category: 'http',
+        requiredParams: ['outputField'],
+      },
+      'http-build': {
+        name: 'HTTP 생성',
+        description: '파라미터로부터 URL을 생성합니다',
+        category: 'http',
+        requiredParams: ['baseUrl'],
       },
     };
   }

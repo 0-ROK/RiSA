@@ -32,7 +32,8 @@ import {
   UnlockOutlined,
   CodeOutlined,
   CheckOutlined,
-  DragOutlined
+  DragOutlined,
+  ApiOutlined
 } from '@ant-design/icons';
 import {
   DndContext,
@@ -84,6 +85,10 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
       case 'base64-encode':
       case 'base64-decode':
         return <CodeOutlined />;
+      case 'http-parse':
+        return <ApiOutlined />;
+      case 'http-build':
+        return <LinkOutlined />;
       default:
         return <SettingOutlined />;
     }
@@ -100,6 +105,9 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
       case 'base64-encode':
       case 'base64-decode':
         return '#13c2c2';
+      case 'http-parse':
+      case 'http-build':
+        return '#fa8c16';
       default:
         return '#666';
     }
@@ -115,6 +123,7 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
   };
 
   const needsKeySelection = step.type === 'rsa-encrypt' || step.type === 'rsa-decrypt';
+  const needsHttpConfig = step.type === 'http-parse' || step.type === 'http-build';
 
   return (
     <div style={{ opacity: step.enabled ? 1 : 0.5 }}>
@@ -167,6 +176,17 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
                   <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
                 </Tooltip>
               )}
+              {/* HTTP 스텝에서 필수 파라미터가 없는 경우 경고 표시 */}
+              {needsHttpConfig && step.type === 'http-parse' && (!step.params || !step.params.outputField) && (
+                <Tooltip title="출력 필드를 선택해주세요">
+                  <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
+                </Tooltip>
+              )}
+              {needsHttpConfig && step.type === 'http-build' && (!step.params || !step.params.baseUrl) && (
+                <Tooltip title="베이스 URL을 입력해주세요">
+                  <span style={{ marginLeft: 8, color: '#ff4d4f', fontSize: '12px' }}>⚠️</span>
+                </Tooltip>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: '#666' }}>
               {moduleInfo?.description || ''}
@@ -209,6 +229,90 @@ const StepCard: React.FC<StepCardProps> = ({ step, index, onUpdate, onDelete, av
                   <Option value="RSA-PKCS1">RSA-PKCS1</Option>
                 </Select>
               </div>
+            )}
+
+            {/* HTTP 파싱 설정 */}
+            {step.type === 'http-parse' && (
+              <>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>출력 필드:</Text>
+                  <Select
+                    style={{ width: '100%', marginTop: 4 }}
+                    placeholder="출력할 필드를 선택하세요"
+                    value={step.params?.outputField}
+                    onChange={(value) => handleParamChange('outputField', value)}
+                  >
+                    <Option value="full">전체 파싱 결과 (JSON)</Option>
+                    <Option value="host">호스트</Option>
+                    <Option value="pathname">경로</Option>
+                    <Option value="pathParams">경로 파라미터 (JSON)</Option>
+                    <Option value="queryParams">쿼리 파라미터 (JSON)</Option>
+                  </Select>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>경로 템플릿 (선택사항):</Text>
+                  <Input
+                    style={{ marginTop: 4 }}
+                    placeholder="/users/:userId/posts"
+                    value={step.params?.pathTemplate || ''}
+                    onChange={(e) => handleParamChange('pathTemplate', e.target.value)}
+                  />
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>쿼리 템플릿 (선택사항):</Text>
+                  <Input
+                    style={{ marginTop: 4 }}
+                    placeholder='["page", "limit"]'
+                    value={step.params?.queryTemplate || ''}
+                    onChange={(e) => handleParamChange('queryTemplate', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* HTTP 생성 설정 */}
+            {step.type === 'http-build' && (
+              <>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>베이스 URL:</Text>
+                  <Input
+                    style={{ marginTop: 4 }}
+                    placeholder="https://api.example.com"
+                    value={step.params?.baseUrl || ''}
+                    onChange={(e) => handleParamChange('baseUrl', e.target.value)}
+                  />
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>입력 매핑:</Text>
+                  <Select
+                    style={{ width: '100%', marginTop: 4 }}
+                    placeholder="입력을 어떻게 매핑할지 선택하세요"
+                    value={step.params?.inputMapping || 'auto'}
+                    onChange={(value) => handleParamChange('inputMapping', value)}
+                  >
+                    <Option value="auto">자동 (JSON 파싱)</Option>
+                    <Option value="json">전체 매핑 객체</Option>
+                  </Select>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>경로 템플릿 (선택사항):</Text>
+                  <Input
+                    style={{ marginTop: 4 }}
+                    placeholder="/users/:userId/posts"
+                    value={step.params?.pathTemplate || ''}
+                    onChange={(e) => handleParamChange('pathTemplate', e.target.value)}
+                  />
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong>쿼리 템플릿 (선택사항):</Text>
+                  <Input
+                    style={{ marginTop: 4 }}
+                    placeholder='["page", "limit"]'
+                    value={step.params?.queryTemplate || ''}
+                    onChange={(e) => handleParamChange('queryTemplate', e.target.value)}
+                  />
+                </div>
+              </>
             )}
 
             <div>
@@ -359,7 +463,7 @@ const ChainBuilderPage: React.FC = () => {
     if (stepIndex === -1) return;
 
     const step = currentTemplate.steps[stepIndex];
-    
+
     // 키 ID가 변경된 경우, 해당 키의 선호 알고리즘을 자동 설정
     if (updates.params?.keyId && updates.params.keyId !== step.params?.keyId) {
       const selectedKey = keys.find(key => key.id === updates.params?.keyId);
@@ -367,7 +471,7 @@ const ChainBuilderPage: React.FC = () => {
         updates.params.algorithm = selectedKey.preferredAlgorithm;
       }
     }
-    
+
     handleUpdateStep(stepIndex, { ...step, ...updates });
   };
 
@@ -469,6 +573,8 @@ const ChainBuilderPage: React.FC = () => {
     { type: 'base64-decode', label: 'Base64 디코딩', category: '인코딩' },
     { type: 'rsa-encrypt', label: 'RSA 암호화', category: '암호화' },
     { type: 'rsa-decrypt', label: 'RSA 복호화', category: '암호화' },
+    { type: 'http-parse', label: 'HTTP 파싱', category: 'HTTP' },
+    { type: 'http-build', label: 'HTTP 생성', category: 'HTTP' },
   ];
 
   if (loading) {
@@ -486,7 +592,7 @@ const ChainBuilderPage: React.FC = () => {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      <PageHeader 
+      <PageHeader
         title="체인 빌더"
         subtitle="다양한 암호화/변환 작업을 순차적으로 연결하여 커스텀 체인을 만들고 실행하세요."
         icon={<BulbOutlined style={{ color: '#faad14' }} />}
@@ -537,7 +643,7 @@ const ChainBuilderPage: React.FC = () => {
               <div style={{ marginBottom: 16 }}>
                 <Text strong>스텝 추가:</Text>
                 <div style={{ marginTop: 8 }}>
-                  {['인코딩', '암호화'].map(category => (
+                  {['인코딩', '암호화', 'HTTP'].map(category => (
                     <div key={category} style={{ marginBottom: 8 }}>
                       <Text type="secondary" style={{ fontSize: '12px' }}>
                         {category}:
@@ -580,7 +686,7 @@ const ChainBuilderPage: React.FC = () => {
                       {currentTemplate.steps.map((step, index) => {
                         // 해당 스텝의 실행 결과 찾기
                         const stepResult = executionResult?.steps?.find((result: any) => result.stepId === step.id);
-                        
+
                         return (
                           <SortableStepItem
                             key={step.id}
@@ -698,24 +804,24 @@ const ChainBuilderPage: React.FC = () => {
                     <div>
                       성공한 스텝: {executionResult.steps.filter((s: any) => s.success).length} / {executionResult.steps.length}
                     </div>
-                    
+
                     {/* 스텝별 실행 상세 정보 */}
                     {executionResult.steps.length > 0 && (
                       <div style={{ marginTop: 12 }}>
                         <Text strong style={{ fontSize: '12px' }}>스텝별 실행 결과:</Text>
                         <div style={{ marginTop: 4 }}>
                           {executionResult.steps.map((stepResult: any, index: number) => (
-                            <div 
+                            <div
                               key={stepResult.stepId || index}
-                              style={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
                                 alignItems: 'center',
                                 padding: '2px 0',
                                 borderBottom: index < executionResult.steps.length - 1 ? '1px solid #f0f0f0' : 'none'
                               }}
                             >
-                              <span style={{ 
+                              <span style={{
                                 color: stepResult.success ? '#52c41a' : '#ff4d4f',
                                 fontWeight: 500
                               }}>
@@ -734,7 +840,7 @@ const ChainBuilderPage: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {executionResult.steps.some((s: any) => !s.success) && (
                       <Alert
                         type="warning"

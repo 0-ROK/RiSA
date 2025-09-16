@@ -28,7 +28,7 @@ export interface RSAKeyPair {
 }
 
 // Chain-related types
-export type ChainStepType = 'url-encode' | 'url-decode' | 'rsa-encrypt' | 'rsa-decrypt' | 'base64-encode' | 'base64-decode';
+export type ChainStepType = 'url-encode' | 'url-decode' | 'rsa-encrypt' | 'rsa-decrypt' | 'base64-encode' | 'base64-decode' | 'http-parse' | 'http-build';
 
 export interface ChainStep {
   id: string;
@@ -36,6 +36,13 @@ export interface ChainStep {
   params?: {
     keyId?: string;
     algorithm?: 'RSA-OAEP' | 'RSA-PKCS1';
+    // HTTP-specific parameters
+    httpTemplateId?: string;
+    baseUrl?: string;
+    pathTemplate?: string;
+    queryTemplate?: string;
+    outputField?: string;
+    inputMapping?: string;
     [key: string]: any;
   };
   enabled: boolean;
@@ -79,7 +86,7 @@ export interface ChainModule {
   type: ChainStepType;
   name: string;
   description: string;
-  category: 'encoding' | 'crypto' | 'transform';
+  category: 'encoding' | 'crypto' | 'transform' | 'http';
   icon: string;
   requiredParams?: string[];
   optionalParams?: string[];

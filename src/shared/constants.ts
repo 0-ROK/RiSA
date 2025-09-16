@@ -61,6 +61,22 @@ export const CHAIN_MODULES = {
     category: 'encoding' as const,
     icon: 'CodeOutlined',
   },
+  'http-parse': {
+    name: 'HTTP 파싱',
+    description: 'URL을 분석하여 구성 요소 추출',
+    category: 'http' as const,
+    icon: 'ApiOutlined',
+    requiredParams: ['outputField'],
+    optionalParams: ['pathTemplate', 'queryTemplate', 'httpTemplateId'],
+  },
+  'http-build': {
+    name: 'HTTP 생성',
+    description: '파라미터로부터 URL 생성',
+    category: 'http' as const,
+    icon: 'LinkOutlined',
+    requiredParams: ['baseUrl'],
+    optionalParams: ['pathTemplate', 'queryTemplate', 'inputMapping', 'httpTemplateId'],
+  },
 } as const;
 
 // Predefined chain templates
