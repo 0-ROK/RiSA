@@ -1,14 +1,16 @@
-import React from 'react';
-import { Layout } from 'antd';
+import React, { Suspense, lazy } from 'react';
+import { Layout, Spin } from 'antd';
 import { Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import MainPage from './pages/MainPage';
-import KeyManagerPage from './pages/KeyManagerPage';
-import HistoryPage from './pages/HistoryPage';
-import EncodingToolsPage from './pages/EncodingToolsPage';
-import ChainBuilderPage from './pages/ChainBuilderPage';
-import HttpParserPage from './pages/HttpParserPage';
-import UpdateNotification from './components/UpdateNotification';
+
+// Route-level code splitting
+const MainPage = lazy(() => import('./pages/MainPage'));
+const KeyManagerPage = lazy(() => import('./pages/KeyManagerPage'));
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const EncodingToolsPage = lazy(() => import('./pages/EncodingToolsPage'));
+const ChainBuilderPage = lazy(() => import('./pages/ChainBuilderPage'));
+const HttpParserPage = lazy(() => import('./pages/HttpParserPage'));
+const UpdateNotification = lazy(() => import('./components/UpdateNotification'));
 
 const { Content } = Layout;
 
@@ -22,17 +24,27 @@ const App: React.FC = () => {
           overflow: 'auto',
           backgroundColor: '#f0f2f5'
         }}>
-          <Routes>
-            <Route path="/" element={<MainPage />} />
-            <Route path="/keys" element={<KeyManagerPage />} />
-            <Route path="/encoding-tools" element={<EncodingToolsPage />} />
-            <Route path="/http-parser" element={<HttpParserPage />} />
-            <Route path="/chain-builder" element={<ChainBuilderPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-          </Routes>
+          <Suspense
+            fallback={
+              <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                <Spin size="large" />
+              </div>
+            }
+          >
+            <Routes>
+              <Route path="/" element={<MainPage />} />
+              <Route path="/keys" element={<KeyManagerPage />} />
+              <Route path="/encoding-tools" element={<EncodingToolsPage />} />
+              <Route path="/http-parser" element={<HttpParserPage />} />
+              <Route path="/chain-builder" element={<ChainBuilderPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+            </Routes>
+          </Suspense>
         </Content>
       </Layout>
-      <UpdateNotification />
+      <Suspense fallback={null}>
+        <UpdateNotification />
+      </Suspense>
     </Layout>
   );
 };

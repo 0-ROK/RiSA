@@ -4,7 +4,8 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
-    "dev:renderer": "cross-env WEB_TARGET=web webpack serve --config webpack.config.js --env NODE_ENV=development",
+    "dev:renderer": "webpack serve --config webpack.config.js --env NODE_ENV=development",
+    "dev:web": "cross-env WEB_TARGET=web NODE_ENV=development webpack serve --config webpack.config.js",
     "dev:main": "webpack --config webpack.config.js --env NODE_ENV=development --watch",
     "build": "npm run build:renderer && npm run build:main && npm run build:preload",
     "build:main": "cross-env TARGET=main webpack --config webpack.config.js --mode production",

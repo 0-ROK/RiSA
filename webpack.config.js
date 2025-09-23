@@ -34,15 +34,32 @@ const createRendererConfig = () => {
     },
     resolve: {
       extensions: ['.tsx', '.ts', '.js'],
-      alias: {
-        '@': path.resolve(__dirname, 'src'),
-      },
+      alias: Object.assign(
+        {
+          '@': path.resolve(__dirname, 'src'),
+        },
+        isWebTarget
+          ? {
+              electron: false,
+              'electron-store': false,
+              'electron-updater': false,
+              'node-forge': false,
+              'node-rsa': false,
+            }
+          : {}
+      ),
     },
     output: {
-      filename: isWebTarget ? 'static/js/renderer.[contenthash].js' : 'renderer.js',
+      filename: isWebTarget
+        ? 'static/js/renderer.[contenthash].js'
+        : 'renderer.[contenthash].js',
+      chunkFilename: isWebTarget
+        ? 'static/js/[name].[contenthash].js'
+        : 'chunks/[name].[contenthash].js',
       path: outputPath,
       publicPath: isWebTarget ? '/' : './',
       clean: true,
+      globalObject: 'globalThis',
     },
     plugins: [
       new HtmlWebpackPlugin({
@@ -50,6 +67,21 @@ const createRendererConfig = () => {
         filename: 'index.html',
       }),
     ],
+   optimization: {
+      splitChunks: isWebTarget
+        ? {
+            chunks: 'all',
+            cacheGroups: {
+              vendor: {
+                test: /[\\/]node_modules[\\/]/,
+                name: 'vendors',
+                chunks: 'all',
+              },
+            },
+          }
+        : false,
+      runtimeChunk: isWebTarget ? 'single' : false,
+    },
     devServer: {
       port: 3000,
       hot: true,
