@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Progress, Typography, Space } from 'antd';
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { getPlatformServices } from '../services';
 
 const { Text, Title } = Typography;
 
@@ -17,6 +18,8 @@ interface DownloadProgress {
   total: number;
 }
 
+const services = getPlatformServices();
+
 const UpdateNotification: React.FC = () => {
   const [updateAvailable, setUpdateAvailable] = useState<UpdateInfo | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
@@ -24,39 +27,39 @@ const UpdateNotification: React.FC = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!window.electronAPI) return;
+    const updateService = services.update;
+    if (!updateService) return;
 
-    // 업데이트 이벤트 리스너 등록
-    window.electronAPI.onUpdateAvailable((info: UpdateInfo) => {
+    updateService.onAvailable?.((info: UpdateInfo) => {
       setUpdateAvailable(info);
     });
 
-    window.electronAPI.onDownloadProgress((progress: DownloadProgress) => {
+    updateService.onDownloadProgress?.((progress: DownloadProgress) => {
       setDownloadProgress(progress);
     });
 
-    window.electronAPI.onUpdateDownloaded((info: UpdateInfo) => {
+    updateService.onDownloaded?.((info: UpdateInfo) => {
       setUpdateDownloaded(info);
       setDownloadProgress(null);
       setUpdateError(null);
     });
 
     // 업데이트 에러 핸들링
-    window.electronAPI.onUpdateError?.((error: string) => {
+    updateService.onError?.((error: string) => {
       setUpdateError(error);
       setDownloadProgress(null);
     });
 
     // 컴포넌트 언마운트 시 이벤트 리스너 제거
     return () => {
-      window.electronAPI.removeUpdateListeners();
+      updateService.removeAll?.();
     };
   }, []);
 
   const handleDownloadUpdate = () => {
     // === 자동 다운로드 ===
     // electron-updater가 GitHub Releases에서 직접 다운로드
-    window.electronAPI.startDownload?.();
+    services.update?.startDownload?.();
     setUpdateAvailable(null);
     // 다운로드 진행 상황은 onDownloadProgress로 추적됨
   };
@@ -71,7 +74,7 @@ const UpdateNotification: React.FC = () => {
   };
 
   const handleRestartAndInstall = () => {
-    window.electronAPI.restartAndInstall();
+    services.update?.restartAndInstall?.();
   };
 
   const formatBytes = (bytes: number): string => {

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { SavedKey } from '../../shared/types';
+import { getPlatformServices } from '../services';
 
 interface KeyContextType {
   keys: SavedKey[];
@@ -21,6 +22,7 @@ export const KeyProvider: React.FC<KeyProviderProps> = ({ children }) => {
   const [keys, setKeys] = useState<SavedKey[]>([]);
   const [selectedKey, setSelectedKey] = useState<SavedKey | null>(null);
   const [loading, setLoading] = useState(true);
+  const services = getPlatformServices();
 
   useEffect(() => {
     loadKeys();
@@ -29,7 +31,7 @@ export const KeyProvider: React.FC<KeyProviderProps> = ({ children }) => {
   const loadKeys = async () => {
     try {
       setLoading(true);
-      const loadedKeys = await window.electronAPI.getSavedKeys();
+      const loadedKeys = await services.key.list();
       setKeys(loadedKeys);
     } catch (error) {
       console.error('Failed to load keys:', error);
@@ -40,7 +42,7 @@ export const KeyProvider: React.FC<KeyProviderProps> = ({ children }) => {
 
   const saveKey = async (key: SavedKey) => {
     try {
-      await window.electronAPI.saveKey(key);
+      await services.key.save(key);
       setKeys(prev => [...prev, key]);
     } catch (error) {
       console.error('Failed to save key:', error);
@@ -50,7 +52,7 @@ export const KeyProvider: React.FC<KeyProviderProps> = ({ children }) => {
 
   const deleteKey = async (keyId: string) => {
     try {
-      await window.electronAPI.deleteKey(keyId);
+      await services.key.remove(keyId);
       setKeys(prev => prev.filter(k => k.id !== keyId));
       
       // If the deleted key was selected, clear selection

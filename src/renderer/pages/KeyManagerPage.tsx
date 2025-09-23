@@ -32,9 +32,12 @@ import { SavedKey } from '../../shared/types';
 import { RSA_KEY_SIZES } from '../../shared/constants';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import PageHeader from '../components/PageHeader';
+import { getPlatformServices } from '../services';
 
 const { Text } = Typography;
 const { TextArea } = Input;
+
+const services = getPlatformServices();
 
 const KeyManagerPage: React.FC = () => {
   const { keys, loading, saveKey, deleteKey } = useKeys();
@@ -56,7 +59,7 @@ const KeyManagerPage: React.FC = () => {
   const handleGenerateKey = async (values: { name: string; keySize: number; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
     setGenerateLoading(true);
     try {
-      const keyPair = await window.electronAPI.generateRSAKeys(values.keySize);
+      const keyPair = await services.crypto.generateKeyPair(values.keySize);
 
       const savedKey: SavedKey = {
         id: crypto.randomUUID(),

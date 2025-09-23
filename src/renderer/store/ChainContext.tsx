@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ChainTemplate, ChainStep, ChainExecutionResult, ChainStepType } from '../../shared/types';
 import { CHAIN_MODULES } from '../../shared/constants';
+import { getPlatformServices } from '../services';
 
 interface ChainContextType {
   templates: ChainTemplate[];
@@ -33,12 +34,13 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
   const [templates, setTemplates] = useState<ChainTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const services = getPlatformServices();
 
   const loadTemplates = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
-      const loadedTemplates = await window.electronAPI.getChainTemplates();
+      const loadedTemplates = await services.chain.listTemplates();
       setTemplates(loadedTemplates);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load chain templates';
@@ -51,7 +53,7 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
 
   const saveTemplate = async (template: ChainTemplate): Promise<void> => {
     try {
-      await window.electronAPI.saveChainTemplate(template);
+      await services.chain.saveTemplate(template);
       await loadTemplates(); // Reload to get updated list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save chain template';
@@ -62,7 +64,7 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
 
   const updateTemplate = async (template: ChainTemplate): Promise<void> => {
     try {
-      await window.electronAPI.updateChainTemplate(template);
+      await services.chain.updateTemplate(template);
       await loadTemplates(); // Reload to get updated list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update chain template';
@@ -73,7 +75,7 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
 
   const deleteTemplate = async (templateId: string): Promise<void> => {
     try {
-      await window.electronAPI.deleteChainTemplate(templateId);
+      await services.chain.removeTemplate(templateId);
       await loadTemplates(); // Reload to get updated list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete chain template';
@@ -89,7 +91,7 @@ export const ChainProvider: React.FC<ChainProviderProps> = ({ children }) => {
     templateName?: string
   ): Promise<ChainExecutionResult> => {
     try {
-      const result = await window.electronAPI.executeChain(steps, inputText, templateId, templateName);
+      const result = await services.chain.executeChain(steps, inputText, templateId, templateName);
       
       // Update template last used time if template was used
       if (templateId) {

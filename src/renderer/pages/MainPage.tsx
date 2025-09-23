@@ -32,10 +32,13 @@ import { DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
 import { HistoryItem } from '../../shared/types';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import PageHeader from '../components/PageHeader';
+import { getPlatformServices } from '../services';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 const { TabPane } = Tabs;
+
+const services = getPlatformServices();
 
 const MainPage: React.FC = () => {
   const { keys, selectedKey, selectKey } = useKeys();
@@ -84,7 +87,7 @@ const MainPage: React.FC = () => {
     setLoading(true);
     setEncryptionStatus('idle');
     try {
-      const result = await window.electronAPI.encryptText(
+      const result = await services.crypto.encrypt(
         encryptText,
         selectedKey.publicKey,
         algorithm
@@ -188,7 +191,7 @@ const MainPage: React.FC = () => {
     setLoading(true);
     setDecryptionStatus('idle');
     try {
-      const result = await window.electronAPI.decryptText(
+      const result = await services.crypto.decrypt(
         decryptText,
         selectedKey.privateKey,
         algorithm
