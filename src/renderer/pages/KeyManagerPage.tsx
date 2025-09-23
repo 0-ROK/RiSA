@@ -32,9 +32,13 @@ import { SavedKey } from '../../shared/types';
 import { RSA_KEY_SIZES } from '../../shared/constants';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import PageHeader from '../components/PageHeader';
+import { getPlatformServices } from '../services';
 
 const { Text } = Typography;
 const { TextArea } = Input;
+
+const services = getPlatformServices();
+const isWebEnvironment = services.environment === 'web';
 
 const KeyManagerPage: React.FC = () => {
   const { keys, loading, saveKey, deleteKey } = useKeys();
@@ -54,9 +58,18 @@ const KeyManagerPage: React.FC = () => {
   const [selectedEditAlgorithm, setSelectedEditAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
 
   const handleGenerateKey = async (values: { name: string; keySize: number; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
+    if (isWebEnvironment) {
+      notification.info({
+        message: '웹 데모 제한',
+        description: '웹 데모에서는 RSA 키 생성을 지원하지 않습니다. 데스크톱 버전에서 키를 생성하거나 직접 등록 기능을 사용해주세요.',
+        placement: 'topRight',
+      });
+      return;
+    }
+
     setGenerateLoading(true);
     try {
-      const keyPair = await window.electronAPI.generateRSAKeys(values.keySize);
+      const keyPair = await services.crypto.generateKeyPair(values.keySize);
 
       const savedKey: SavedKey = {
         id: crypto.randomUUID(),
@@ -391,14 +404,17 @@ const KeyManagerPage: React.FC = () => {
         icon={<KeyOutlined />}
         extra={
           <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setGenerateModalVisible(true)}
-              size="large"
-            >
-              새 키 생성
-            </Button>
+            <Tooltip title={isWebEnvironment ? '웹 데모에서는 키 생성을 지원하지 않습니다.' : undefined}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setGenerateModalVisible(true)}
+                size="large"
+                disabled={isWebEnvironment}
+              >
+                새 키 생성
+              </Button>
+            </Tooltip>
             <Button
               type="default"
               icon={<ImportOutlined />}
@@ -417,6 +433,16 @@ const KeyManagerPage: React.FC = () => {
         width: '100%',
         flex: 1
       }}>
+
+        {isWebEnvironment && (
+          <Alert
+            type="info"
+            showIcon
+            message="웹 데모에서는 키 생성이 제한됩니다"
+            description="데스크톱 버전에서 생성한 키를 가져오거나 직접 키를 등록하여 기능을 체험할 수 있습니다."
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         <Card>
           <Table

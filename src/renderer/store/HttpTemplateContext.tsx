@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { HttpTemplate, HttpTemplateUsage } from '../../shared/types';
+import { getPlatformServices } from '../services';
 
 interface HttpTemplateContextType {
   templates: HttpTemplate[];
@@ -29,12 +30,13 @@ export const HttpTemplateProvider: React.FC<HttpTemplateProviderProps> = ({ chil
   const [templates, setTemplates] = useState<HttpTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const services = getPlatformServices();
 
   const loadTemplates = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
-      const loadedTemplates = await window.electronAPI.getHttpTemplates();
+      const loadedTemplates = await services.httpTemplate.list();
       setTemplates(loadedTemplates);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load HTTP templates';
@@ -47,7 +49,7 @@ export const HttpTemplateProvider: React.FC<HttpTemplateProviderProps> = ({ chil
 
   const saveTemplate = async (template: HttpTemplate): Promise<void> => {
     try {
-      await window.electronAPI.saveHttpTemplate(template);
+      await services.httpTemplate.save(template);
       await loadTemplates(); // Reload to get updated list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save HTTP template';
@@ -58,7 +60,7 @@ export const HttpTemplateProvider: React.FC<HttpTemplateProviderProps> = ({ chil
 
   const updateTemplate = async (template: HttpTemplate): Promise<void> => {
     try {
-      await window.electronAPI.updateHttpTemplate(template);
+      await services.httpTemplate.update(template);
       await loadTemplates(); // Reload to get updated list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update HTTP template';
@@ -69,7 +71,7 @@ export const HttpTemplateProvider: React.FC<HttpTemplateProviderProps> = ({ chil
 
   const deleteTemplate = async (templateId: string): Promise<void> => {
     try {
-      await window.electronAPI.deleteHttpTemplate(templateId);
+      await services.httpTemplate.remove(templateId);
       await loadTemplates(); // Reload to get updated list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete HTTP template';
@@ -84,7 +86,7 @@ export const HttpTemplateProvider: React.FC<HttpTemplateProviderProps> = ({ chil
     queryParams: Record<string, string>
   ): Promise<string> => {
     try {
-      const result = await window.electronAPI.useHttpTemplate(templateId, pathParams, queryParams);
+      const result = await services.httpTemplate.useTemplate(templateId, pathParams, queryParams);
 
       // Update template last used time
       const template = templates.find(t => t.id === templateId);

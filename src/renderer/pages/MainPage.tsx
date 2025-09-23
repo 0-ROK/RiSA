@@ -32,10 +32,14 @@ import { DEFAULT_ENCRYPTION_OPTIONS } from '../../shared/constants';
 import { HistoryItem } from '../../shared/types';
 import AlgorithmSelector from '../components/AlgorithmSelector';
 import PageHeader from '../components/PageHeader';
+import { getPlatformServices } from '../services';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 const { TabPane } = Tabs;
+
+const services = getPlatformServices();
+const isWebEnvironment = services.environment === 'web';
 
 const MainPage: React.FC = () => {
   const { keys, selectedKey, selectKey } = useKeys();
@@ -55,6 +59,14 @@ const MainPage: React.FC = () => {
   const [decryptionStatus, setDecryptionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [lastError, setLastError] = useState<string>('');
 
+  const showWebRestrictionNotice = () => {
+    notification.info({
+      message: '웹 데모 제한',
+      description: '웹 데모에서는 RSA 암·복호화 기능을 사용할 수 없습니다. 데스크톱 버전에서 전체 기능을 이용해주세요.',
+      placement: 'topRight',
+    });
+  };
+
   // 선택된 키가 변경될 때마다 selectedKey 업데이트 및 알고리즘 자동 설정
   useEffect(() => {
     const key = keys.find(k => k.id === selectedKeyId);
@@ -67,6 +79,11 @@ const MainPage: React.FC = () => {
   }, [selectedKeyId, keys, selectKey]);
 
   const handleEncrypt = async () => {
+    if (isWebEnvironment) {
+      showWebRestrictionNotice();
+      return;
+    }
+
     if (!encryptText.trim()) {
       message.error('암호화할 텍스트를 입력해주세요.');
       return;
@@ -84,7 +101,7 @@ const MainPage: React.FC = () => {
     setLoading(true);
     setEncryptionStatus('idle');
     try {
-      const result = await window.electronAPI.encryptText(
+      const result = await services.crypto.encrypt(
         encryptText,
         selectedKey.publicKey,
         algorithm
@@ -140,6 +157,11 @@ const MainPage: React.FC = () => {
   };
 
   const handleDecrypt = async () => {
+    if (isWebEnvironment) {
+      showWebRestrictionNotice();
+      return;
+    }
+
     if (!decryptText.trim()) {
       message.error('복호화할 텍스트를 입력해주세요.');
       return;
@@ -188,7 +210,7 @@ const MainPage: React.FC = () => {
     setLoading(true);
     setDecryptionStatus('idle');
     try {
-      const result = await window.electronAPI.decryptText(
+      const result = await services.crypto.decrypt(
         decryptText,
         selectedKey.privateKey,
         algorithm
@@ -489,8 +511,8 @@ const MainPage: React.FC = () => {
   // 탭 오른쪽에 표시할 버튼들
   const renderTabBarExtraContent = () => {
     const isEncryptTab = activeTab === 'encrypt';
-    const hasInputText = isEncryptTab ? encryptText.trim() : decryptText.trim();
-    const canExecute = selectedKey && hasInputText && !loading;
+    const hasInputText = (isEncryptTab ? encryptText : decryptText).trim();
+    const canExecute = !isWebEnvironment && !!selectedKey && !!hasInputText && !loading;
 
     return (
       <Space>
@@ -533,6 +555,16 @@ const MainPage: React.FC = () => {
         width: '100%',
         flex: 1
       }}>
+
+        {isWebEnvironment && (
+          <Alert
+            type="info"
+            showIcon
+            message="웹 데모 제한 안내"
+            description="웹 데모에서는 RSA 암·복호화 기능이 비활성화되어 있습니다. 데스크톱 앱에서 전체 기능을 사용하거나 체인 빌더, HTTP 도구 등을 체험해보세요."
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         {/* 키 선택 및 알고리즘 선택 섹션 */}
         <Card style={{ marginBottom: 16, flexShrink: 0 }}>
