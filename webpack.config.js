@@ -41,7 +41,7 @@ const createRendererConfig = () => {
     output: {
       filename: isWebTarget ? 'static/js/renderer.[contenthash].js' : 'renderer.js',
       path: outputPath,
-      publicPath: '/',
+      publicPath: isWebTarget ? '/' : './',
       clean: true,
     },
     plugins: [
