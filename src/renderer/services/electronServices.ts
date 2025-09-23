@@ -15,73 +15,55 @@ const ensureElectronAPI = () => {
   return window.electronAPI;
 };
 
-const createKeyService = (): KeyService => {
-  const electronAPI = ensureElectronAPI();
-  return {
-    list: () => electronAPI.getSavedKeys(),
-    save: (key) => electronAPI.saveKey(key),
-    remove: (keyId) => electronAPI.deleteKey(keyId),
-  };
-};
+const createKeyService = (): KeyService => ({
+  list: () => ensureElectronAPI().getSavedKeys(),
+  save: (key) => ensureElectronAPI().saveKey(key),
+  remove: (keyId) => ensureElectronAPI().deleteKey(keyId),
+});
 
-const createHistoryService = (): HistoryService => {
-  const electronAPI = ensureElectronAPI();
-  return {
-    list: (filter) => electronAPI.getHistory(filter),
-    save: (item) => electronAPI.saveHistoryItem(item),
-    remove: (historyId) => electronAPI.deleteHistoryItem(historyId),
-    clear: () => electronAPI.clearHistory(),
-  };
-};
+const createHistoryService = (): HistoryService => ({
+  list: (filter) => ensureElectronAPI().getHistory(filter),
+  save: (item) => ensureElectronAPI().saveHistoryItem(item),
+  remove: (historyId) => ensureElectronAPI().deleteHistoryItem(historyId),
+  clear: () => ensureElectronAPI().clearHistory(),
+});
 
-const createChainService = (): ChainService => {
-  const electronAPI = ensureElectronAPI();
-  return {
-    listTemplates: () => electronAPI.getChainTemplates(),
-    saveTemplate: (template) => electronAPI.saveChainTemplate(template),
-    updateTemplate: (template) => electronAPI.updateChainTemplate(template),
-    removeTemplate: (templateId) => electronAPI.deleteChainTemplate(templateId),
-    executeChain: (steps, inputText, templateId, templateName) =>
-      electronAPI.executeChain(steps, inputText, templateId, templateName),
-  };
-};
+const createChainService = (): ChainService => ({
+  listTemplates: () => ensureElectronAPI().getChainTemplates(),
+  saveTemplate: (template) => ensureElectronAPI().saveChainTemplate(template),
+  updateTemplate: (template) => ensureElectronAPI().updateChainTemplate(template),
+  removeTemplate: (templateId) => ensureElectronAPI().deleteChainTemplate(templateId),
+  executeChain: (steps, inputText, templateId, templateName) =>
+    ensureElectronAPI().executeChain(steps, inputText, templateId, templateName),
+});
 
-const createHttpTemplateService = (): HttpTemplateService => {
-  const electronAPI = ensureElectronAPI();
-  return {
-    list: () => electronAPI.getHttpTemplates(),
-    save: (template) => electronAPI.saveHttpTemplate(template),
-    update: (template) => electronAPI.updateHttpTemplate(template),
-    remove: (templateId) => electronAPI.deleteHttpTemplate(templateId),
-    useTemplate: (templateId, pathParams, queryParams) =>
-      electronAPI.useHttpTemplate(templateId, pathParams, queryParams),
-  };
-};
+const createHttpTemplateService = (): HttpTemplateService => ({
+  list: () => ensureElectronAPI().getHttpTemplates(),
+  save: (template) => ensureElectronAPI().saveHttpTemplate(template),
+  update: (template) => ensureElectronAPI().updateHttpTemplate(template),
+  remove: (templateId) => ensureElectronAPI().deleteHttpTemplate(templateId),
+  useTemplate: (templateId, pathParams, queryParams) =>
+    ensureElectronAPI().useHttpTemplate(templateId, pathParams, queryParams),
+});
 
-const createCryptoService = (): CryptoService => {
-  const electronAPI = ensureElectronAPI();
-  return {
-    encrypt: (text, publicKey, algorithm) =>
-      electronAPI.encryptText(text, publicKey, algorithm),
-    decrypt: (encryptedText, privateKey, algorithm) =>
-      electronAPI.decryptText(encryptedText, privateKey, algorithm),
-    generateKeyPair: (keySize) => electronAPI.generateRSAKeys(keySize),
-  };
-};
+const createCryptoService = (): CryptoService => ({
+  encrypt: (text, publicKey, algorithm) =>
+    ensureElectronAPI().encryptText(text, publicKey, algorithm),
+  decrypt: (encryptedText, privateKey, algorithm) =>
+    ensureElectronAPI().decryptText(encryptedText, privateKey, algorithm),
+  generateKeyPair: (keySize) => ensureElectronAPI().generateRSAKeys(keySize),
+});
 
-const createUpdateService = (): UpdateService => {
-  const electronAPI = ensureElectronAPI();
-  return {
-    onAvailable: (callback) => electronAPI.onUpdateAvailable?.(callback),
-    onDownloadProgress: (callback) => electronAPI.onDownloadProgress?.(callback),
-    onDownloaded: (callback) => electronAPI.onUpdateDownloaded?.(callback),
-    onError: (callback) => electronAPI.onUpdateError?.(callback),
-    removeAll: () => electronAPI.removeUpdateListeners?.(),
-    checkForUpdates: () => electronAPI.checkForUpdates?.(),
-    startDownload: () => electronAPI.startDownload?.(),
-    restartAndInstall: () => electronAPI.restartAndInstall?.(),
-  };
-};
+const createUpdateService = (): UpdateService => ({
+  onAvailable: (callback) => ensureElectronAPI().onUpdateAvailable?.(callback),
+  onDownloadProgress: (callback) => ensureElectronAPI().onDownloadProgress?.(callback),
+  onDownloaded: (callback) => ensureElectronAPI().onUpdateDownloaded?.(callback),
+  onError: (callback) => ensureElectronAPI().onUpdateError?.(callback),
+  removeAll: () => ensureElectronAPI().removeUpdateListeners?.(),
+  checkForUpdates: () => ensureElectronAPI().checkForUpdates?.(),
+  startDownload: () => ensureElectronAPI().startDownload?.(),
+  restartAndInstall: () => ensureElectronAPI().restartAndInstall?.(),
+});
 
 export const electronServices: PlatformServices = {
   environment: 'electron',
