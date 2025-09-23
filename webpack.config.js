@@ -3,51 +3,65 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 const isDev = process.env.NODE_ENV === 'development';
 
-const rendererConfig = {
-  mode: isDev ? 'development' : 'production',
-  entry: './src/renderer/index.tsx',
-  target: 'electron-renderer',
-  devtool: isDev ? 'source-map' : false,
-  module: {
-    rules: [
-      {
-        test: /\.tsx?$/,
-        use: 'ts-loader',
-        exclude: /node_modules/,
-      },
-      {
-        test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
-      },
-      {
-        test: /\.(png|jpe?g|gif|svg)$/i,
-        type: 'asset/resource',
-      },
-    ],
-  },
-  resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
+const isWebTarget = process.env.WEB_TARGET === 'web';
+
+const createRendererConfig = () => {
+  const outputPath = isWebTarget
+    ? path.resolve(__dirname, 'dist/web')
+    : path.resolve(__dirname, 'dist');
+
+  return {
+    mode: isDev ? 'development' : 'production',
+    entry: './src/renderer/index.tsx',
+    target: isWebTarget ? 'web' : 'electron-renderer',
+    devtool: isDev ? 'source-map' : false,
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          use: 'ts-loader',
+          exclude: /node_modules/,
+        },
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader'],
+        },
+        {
+          test: /\.(png|jpe?g|gif|svg)$/i,
+          type: 'asset/resource',
+        },
+      ],
     },
-  },
-  output: {
-    filename: 'renderer.js',
-    path: path.resolve(__dirname, 'dist'),
-    clean: true,
-  },
-  plugins: [
-    new HtmlWebpackPlugin({
-      template: './src/renderer/index.html',
-      filename: 'index.html',
-    }),
-  ],
-  devServer: {
-    port: 3000,
-    hot: true,
-    historyApiFallback: true,
-  },
+    resolve: {
+      extensions: ['.tsx', '.ts', '.js'],
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+      },
+    },
+    output: {
+      filename: isWebTarget ? 'static/js/renderer.[contenthash].js' : 'renderer.js',
+      path: outputPath,
+      publicPath: '/',
+      clean: true,
+    },
+    plugins: [
+      new HtmlWebpackPlugin({
+        template: './src/renderer/index.html',
+        filename: 'index.html',
+      }),
+    ],
+    devServer: {
+      port: 3000,
+      hot: true,
+      historyApiFallback: true,
+      static: {
+        directory: outputPath,
+      },
+    },
+  };
 };
+
+const rendererConfig = createRendererConfig();
 
 const mainConfig = {
   mode: isDev ? 'development' : 'production',
@@ -112,11 +126,17 @@ const preloadConfig = {
 };
 
 module.exports = (env, argv) => {
+  if (isWebTarget) {
+    return rendererConfig;
+  }
+
   if (process.env.TARGET === 'main') {
     return mainConfig;
-  } else if (process.env.TARGET === 'preload') {
-    return preloadConfig;
-  } else {
-    return [rendererConfig, mainConfig, preloadConfig];
   }
+
+  if (process.env.TARGET === 'preload') {
+    return preloadConfig;
+  }
+
+  return [rendererConfig, mainConfig, preloadConfig];
 };

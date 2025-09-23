@@ -21,6 +21,10 @@ interface DownloadProgress {
 const services = getPlatformServices();
 
 const UpdateNotification: React.FC = () => {
+  if (services.environment !== 'electron') {
+    return null;
+  }
+
   const [updateAvailable, setUpdateAvailable] = useState<UpdateInfo | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [updateDownloaded, setUpdateDownloaded] = useState<UpdateInfo | null>(null);
