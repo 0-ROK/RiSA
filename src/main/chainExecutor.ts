@@ -294,25 +294,17 @@ export class ChainExecutor {
           const mapping = paramMappings[paramName];
           if (mapping) {
             switch (mapping.type) {
-              case 'auto':
-                // Use entire input as parameter value
-                pathParams[paramName] = String(inputData);
-                break;
-              case 'field':
-                // Extract field from JSON input
-                if (mapping.value && mapping.value.startsWith('$.')) {
-                  const fieldName = mapping.value.substring(2);
-                  if (typeof inputData === 'object' && inputData !== null && fieldName in inputData) {
-                    pathParams[paramName] = String(inputData[fieldName]);
-                  }
-                }
-                break;
               case 'fixed':
                 // Use fixed value
                 pathParams[paramName] = mapping.value || '';
                 break;
+              case 'skip':
+                // Explicitly omit the parameter
+                pathParams[paramName] = '';
+                break;
+              case 'auto':
               default:
-                // Default to auto mapping
+                // Use entire input as parameter value
                 pathParams[paramName] = String(inputData);
             }
           } else {
@@ -335,15 +327,6 @@ export class ChainExecutor {
                   case 'auto':
                     // Use entire input as parameter value
                     queryParams[paramName] = String(inputData);
-                    break;
-                  case 'field':
-                    // Extract field from JSON input
-                    if (mapping.value && mapping.value.startsWith('$.')) {
-                      const fieldName = mapping.value.substring(2);
-                      if (typeof inputData === 'object' && inputData !== null && fieldName in inputData) {
-                        queryParams[paramName] = String(inputData[fieldName]);
-                      }
-                    }
                     break;
                   case 'fixed':
                     // Use fixed value

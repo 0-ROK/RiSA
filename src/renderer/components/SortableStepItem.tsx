@@ -97,6 +97,12 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   const availablePathParams = selectedTemplate ? extractPathParams(selectedTemplate.pathTemplate) : [];
   const availableQueryParams = selectedTemplate ? extractQueryParams(selectedTemplate.queryTemplate) : [];
 
+  const normalizeMappingType = (type?: string): 'auto' | 'fixed' | 'skip' => {
+    if (type === 'fixed') return 'fixed';
+    if (type === 'skip') return 'skip';
+    return 'auto';
+  };
+
   const getStepIcon = () => {
     switch (step.type) {
       case 'rsa-encrypt':
@@ -457,7 +463,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                                   </span>
                                   <Select
                                     placeholder="매핑 선택"
-                                    value={step.params?.paramMappings?.[param]?.type || 'auto'}
+                                    value={normalizeMappingType(step.params?.paramMappings?.[param]?.type)}
                                     onChange={(value) => {
                                       const paramMappings = { ...step.params?.paramMappings };
                                       paramMappings[param] = { type: value };
@@ -468,30 +474,11 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                                     style={{ flex: 1 }}
                                     size="small"
                                   >
-                                    <Select.Option value="auto">🔄 이전 출력 전체</Select.Option>
-                                    <Select.Option value="field">📌 JSON 필드</Select.Option>
+                                    <Select.Option value="auto">🔄 이전 출력</Select.Option>
                                     <Select.Option value="fixed">📎 고정 값</Select.Option>
+                                    <Select.Option value="skip">⏭️ 사용하지 않음</Select.Option>
                                   </Select>
                                 </div>
-
-                                {step.params?.paramMappings?.[param]?.type === 'field' && (
-                                  <Input
-                                    placeholder="필드 경로 (예: $.id)"
-                                    value={step.params?.paramMappings?.[param]?.value || ''}
-                                    onChange={(e) => {
-                                      const paramMappings = { ...step.params?.paramMappings };
-                                      paramMappings[param] = {
-                                        ...paramMappings[param],
-                                        value: e.target.value
-                                      };
-                                      onUpdateStep(step.id, {
-                                        params: { ...step.params, paramMappings }
-                                      });
-                                    }}
-                                    size="small"
-                                    style={{ marginTop: 4, marginLeft: 68 }}
-                                  />
-                                )}
 
                                 {step.params?.paramMappings?.[param]?.type === 'fixed' && (
                                   <Input
@@ -530,7 +517,7 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                                   </span>
                                   <Select
                                     placeholder="매핑 선택"
-                                    value={step.params?.queryMappings?.[param]?.type || 'auto'}
+                                    value={normalizeMappingType(step.params?.queryMappings?.[param]?.type)}
                                     onChange={(value) => {
                                       const queryMappings = { ...step.params?.queryMappings };
                                       queryMappings[param] = { type: value };
@@ -541,31 +528,11 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
                                     style={{ flex: 1 }}
                                     size="small"
                                   >
-                                    <Select.Option value="auto">🔄 이전 출력 전체</Select.Option>
-                                    <Select.Option value="field">📌 JSON 필드</Select.Option>
+                                    <Select.Option value="auto">🔄 이전 출력</Select.Option>
                                     <Select.Option value="fixed">📎 고정 값</Select.Option>
-                                    <Select.Option value="skip">⏭️ 생략</Select.Option>
+                                    <Select.Option value="skip">⏭️ 사용하지 않음</Select.Option>
                                   </Select>
                                 </div>
-
-                                {step.params?.queryMappings?.[param]?.type === 'field' && (
-                                  <Input
-                                    placeholder="필드 경로 (예: $.page)"
-                                    value={step.params?.queryMappings?.[param]?.value || ''}
-                                    onChange={(e) => {
-                                      const queryMappings = { ...step.params?.queryMappings };
-                                      queryMappings[param] = {
-                                        ...queryMappings[param],
-                                        value: e.target.value
-                                      };
-                                      onUpdateStep(step.id, {
-                                        params: { ...step.params, queryMappings }
-                                      });
-                                    }}
-                                    size="small"
-                                    style={{ marginTop: 4, marginLeft: 68 }}
-                                  />
-                                )}
 
                                 {step.params?.queryMappings?.[param]?.type === 'fixed' && (
                                   <Input
