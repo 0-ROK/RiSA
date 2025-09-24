@@ -9,8 +9,6 @@ type Platform = 'mac' | 'windows' | 'linux' | 'unknown';
 
 const services = getPlatformServices();
 
-const STORAGE_KEY = 'risa.web.downloadPrompt.dismissed';
-
 const detectPlatform = (): Platform => {
   if (typeof navigator === 'undefined') {
     return 'unknown';
@@ -58,14 +56,7 @@ const WebDownloadPrompt: React.FC = () => {
   }
 
   const [platform, setPlatform] = useState<Platform>('unknown');
-  const [visible, setVisible] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return window.localStorage.getItem(STORAGE_KEY) !== 'true';
-    } catch {
-      return true;
-    }
-  });
+  const [visible, setVisible] = useState<boolean>(true);
 
   useEffect(() => {
     if (services.environment !== 'web') return;
@@ -77,12 +68,6 @@ const WebDownloadPrompt: React.FC = () => {
 
   const handleDismiss = () => {
     setVisible(false);
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, 'true');
-    } catch {
-      // Ignore storage failures
-    }
   };
 
   if (!visible) {
