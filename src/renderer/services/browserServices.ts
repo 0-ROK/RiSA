@@ -52,33 +52,202 @@ const STORAGE_KEYS = {
   httpTemplates: 'risa.httpTemplates',
 } as const;
 
-const readCollection = <T>(key: string, revive?: (item: any) => T): T[] => {
+const DATA_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+type StoredItem<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const DEFAULT_EXPIRES_AT = () => Date.now() + DATA_EXPIRATION_MS;
+
+const expirationRegistry = new WeakMap<object, number>();
+
+const registerExpiration = (value: unknown, expiresAt: number): void => {
+  if (isRecord(value)) {
+    expirationRegistry.set(value as object, expiresAt);
+  }
+};
+
+const getRegisteredExpiration = (value: unknown): number | undefined => {
+  if (isRecord(value)) {
+    return expirationRegistry.get(value as object);
+  }
+  return undefined;
+};
+
+const writeStoredItems = <T>(key: string, items: StoredItem<T>[]): void => {
+  getStorage().setItem(key, JSON.stringify(items));
+};
+
+const writeCollection = <T>(
+  key: string,
+  value: T[],
+  getExpiresAt: (item: T) => number | undefined = () => DEFAULT_EXPIRES_AT(),
+): void => {
+  const storedItems: StoredItem<T>[] = [];
+
+  value.forEach((item) => {
+    const expiresAt = getExpiresAt(item);
+    if (!isFiniteNumber(expiresAt)) {
+      return;
+    }
+    if (isRecord(item)) {
+      (item as Record<string, unknown>).expiresAt = expiresAt;
+    }
+    registerExpiration(item, expiresAt);
+    storedItems.push({ value: item, expiresAt });
+  });
+
+  writeStoredItems(key, storedItems);
+};
+
+interface ParsedEntry<T> {
+  item: StoredItem<T>;
+  needsMigration: boolean;
+}
+
+const parseStoredEntry = <T>(
+  entry: unknown,
+  revive: ((raw: unknown) => T) | undefined,
+  now: number,
+): ParsedEntry<T> | null => {
+  let rawValue: unknown;
+  let expiresAt: number | undefined;
+  let needsMigration = false;
+
+  if (isRecord(entry) && 'value' in entry) {
+    const record = entry as Record<string, unknown>;
+    rawValue = record.value;
+
+    if (isFiniteNumber(record.expiresAt)) {
+      expiresAt = record.expiresAt;
+    } else if (isFiniteNumber(record.createdAt)) {
+      expiresAt = record.createdAt + DATA_EXPIRATION_MS;
+      needsMigration = true;
+    } else {
+      needsMigration = true;
+    }
+  } else {
+    rawValue = entry;
+    needsMigration = true;
+  }
+
+  let value: T;
+  try {
+    value = revive ? revive(rawValue) : (rawValue as T);
+  } catch {
+    return null;
+  }
+
+  if (!isFiniteNumber(expiresAt) || expiresAt < now) {
+    return null;
+  }
+
+  if (isRecord(value)) {
+    (value as Record<string, unknown>).expiresAt = expiresAt;
+  }
+  return {
+    item: { value, expiresAt },
+    needsMigration,
+  };
+};
+
+const readCollection = <T>(key: string, revive?: (raw: unknown) => T): T[] => {
   try {
     const raw = getStorage().getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return revive ? parsed.map(item => revive(item)) : (parsed as T[]);
+
+    const now = Date.now();
+    const migratedItems: StoredItem<T>[] = [];
+    const result: T[] = [];
+    let requiresRewrite = false;
+
+    const entries: unknown[] = parsed;
+    entries.forEach((entry) => {
+      const parsedEntry = parseStoredEntry(entry, revive, now);
+      if (!parsedEntry) {
+        requiresRewrite = true;
+        return;
+      }
+
+      const { item, needsMigration } = parsedEntry;
+      migratedItems.push(item);
+      result.push(item.value);
+      registerExpiration(item.value, item.expiresAt);
+      if (needsMigration) {
+        requiresRewrite = true;
+      }
+    });
+
+    if (requiresRewrite) {
+      writeStoredItems(key, migratedItems);
+    }
+
+    return result;
   } catch {
     return [];
   }
 };
 
-const writeCollection = <T>(key: string, value: T[]): void => {
-  getStorage().setItem(key, JSON.stringify(value));
+const reviveDate = (value: unknown, fallback = new Date()): Date => {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? fallback : date;
+  }
+  return fallback;
 };
 
-const reviveDate = (value: any, fallback = new Date()): Date => {
-  if (!value) return fallback;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? fallback : date;
+const reviveSavedKey = (raw: unknown): SavedKey => {
+  if (!isRecord(raw)) {
+    throw new Error('Invalid saved key record');
+  }
+  const record = raw as Record<string, unknown>;
+  const base = raw as unknown as SavedKey;
+  return {
+    ...base,
+    created: reviveDate(record.created),
+  };
+};
+
+const reviveHistoryItem = (raw: unknown): HistoryItem => {
+  if (!isRecord(raw)) {
+    throw new Error('Invalid history record');
+  }
+  const record = raw as Record<string, unknown>;
+  const base = raw as unknown as HistoryItem;
+  return {
+    ...base,
+    timestamp: reviveDate(record.timestamp),
+  };
+};
+
+const resolveKeyExpiresAt = (key: SavedKey): number | undefined => {
+  const registered = getRegisteredExpiration(key);
+  if (isFiniteNumber(registered)) {
+    return registered;
+  }
+  if (isFiniteNumber((key as unknown as Record<string, unknown>).expiresAt)) {
+    return (key as unknown as Record<string, unknown>).expiresAt as number;
+  }
+  const created = key.created instanceof Date ? key.created : new Date(key.created);
+  const timestamp = created.getTime();
+  return Number.isNaN(timestamp) ? undefined : timestamp + DATA_EXPIRATION_MS;
 };
 
 const loadKeys = async (): Promise<SavedKey[]> =>
-  readCollection<SavedKey>(STORAGE_KEYS.keys, (item) => ({
-    ...item,
-    created: reviveDate(item.created),
-  }));
+  readCollection<SavedKey>(STORAGE_KEYS.keys, reviveSavedKey);
 
 const keyService: KeyService = {
   async list() {
@@ -92,12 +261,12 @@ const keyService: KeyService = {
     } else {
       keys.push(key);
     }
-    writeCollection(STORAGE_KEYS.keys, keys);
+    writeCollection(STORAGE_KEYS.keys, keys, resolveKeyExpiresAt);
   },
   async remove(keyId) {
     const keys = await loadKeys();
     const filtered = keys.filter(key => key.id !== keyId);
-    writeCollection(STORAGE_KEYS.keys, filtered);
+    writeCollection(STORAGE_KEYS.keys, filtered, resolveKeyExpiresAt);
   },
 };
 
@@ -113,11 +282,21 @@ const matchesFilter = (item: HistoryItem, filter?: HistoryFilter): boolean => {
   return true;
 };
 
+const resolveHistoryExpiresAt = (item: HistoryItem): number | undefined => {
+  const registered = getRegisteredExpiration(item);
+  if (isFiniteNumber(registered)) {
+    return registered;
+  }
+  if (isFiniteNumber((item as unknown as Record<string, unknown>).expiresAt)) {
+    return (item as unknown as Record<string, unknown>).expiresAt as number;
+  }
+  const timestamp = item.timestamp instanceof Date ? item.timestamp : new Date(item.timestamp);
+  const value = timestamp.getTime();
+  return Number.isNaN(value) ? undefined : value + DATA_EXPIRATION_MS;
+};
+
 const loadHistory = async (): Promise<HistoryItem[]> =>
-  readCollection<HistoryItem>(STORAGE_KEYS.history, (item) => ({
-    ...item,
-    timestamp: reviveDate(item.timestamp),
-  }));
+  readCollection<HistoryItem>(STORAGE_KEYS.history, reviveHistoryItem);
 
 const historyService: HistoryService = {
   async list(filter) {
@@ -127,28 +306,49 @@ const historyService: HistoryService = {
   async save(item) {
     const history = await loadHistory();
     history.unshift(item);
-    writeCollection(STORAGE_KEYS.history, history);
+    writeCollection(STORAGE_KEYS.history, history, resolveHistoryExpiresAt);
   },
   async remove(historyId) {
     const history = await loadHistory();
-    writeCollection(STORAGE_KEYS.history, history.filter(item => item.id !== historyId));
+    writeCollection(
+      STORAGE_KEYS.history,
+      history.filter(item => item.id !== historyId),
+      resolveHistoryExpiresAt,
+    );
   },
   async clear() {
     writeCollection(STORAGE_KEYS.history, []);
   },
 };
 
-const reviveChainTemplate = (template: ChainTemplate): ChainTemplate => ({
-  ...template,
-  created: reviveDate(template.created),
-  lastUsed: template.lastUsed ? reviveDate(template.lastUsed) : undefined,
-});
+const reviveChainTemplate = (template: unknown): ChainTemplate => {
+  if (!isRecord(template)) {
+    throw new Error('Invalid chain template record');
+  }
+  const record = template as Record<string, unknown>;
+  const base = template as unknown as ChainTemplate;
+  return {
+    ...base,
+    created: reviveDate(record.created),
+    lastUsed: record.lastUsed ? reviveDate(record.lastUsed) : undefined,
+  };
+};
 
 const chainTemplatesKey = STORAGE_KEYS.chainTemplates;
 
-const listTemplates = async (): Promise<ChainTemplate[]> => {
-  return readCollection(chainTemplatesKey, (item) => reviveChainTemplate(item));
+const resolveTemplateExpiresAt = (template: ChainTemplate): number | undefined => {
+  const registered = getRegisteredExpiration(template);
+  if (isFiniteNumber(registered)) {
+    return registered;
+  }
+  if (isFiniteNumber((template as unknown as Record<string, unknown>).expiresAt)) {
+    return (template as unknown as Record<string, unknown>).expiresAt as number;
+  }
+  return DEFAULT_EXPIRES_AT();
 };
+
+const listTemplates = async (): Promise<ChainTemplate[]> =>
+  readCollection(chainTemplatesKey, reviveChainTemplate);
 
 const simpleBase64Encode = (value: string): string => {
   if (typeof Buffer !== 'undefined') {
@@ -587,7 +787,7 @@ const chainService: ChainService = {
     } else {
       templates.push(template);
     }
-    writeCollection(chainTemplatesKey, templates);
+    writeCollection(chainTemplatesKey, templates, resolveTemplateExpiresAt);
   },
   async updateTemplate(template) {
     const templates = await listTemplates();
@@ -596,11 +796,15 @@ const chainService: ChainService = {
       throw new Error(`템플릿을 찾을 수 없습니다: ${template.id}`);
     }
     templates[index] = template;
-    writeCollection(chainTemplatesKey, templates);
+    writeCollection(chainTemplatesKey, templates, resolveTemplateExpiresAt);
   },
   async removeTemplate(templateId) {
     const templates = await listTemplates();
-    writeCollection(chainTemplatesKey, templates.filter(t => t.id !== templateId));
+    writeCollection(
+      chainTemplatesKey,
+      templates.filter(t => t.id !== templateId),
+      resolveTemplateExpiresAt,
+    );
   },
   async executeChain(steps, inputText, templateId, templateName) {
     const results: ChainStepResult[] = [];
@@ -660,12 +864,32 @@ const chainService: ChainService = {
   },
 };
 
+const resolveHttpTemplateExpiresAt = (template: HttpTemplate): number | undefined => {
+  const registered = getRegisteredExpiration(template);
+  if (isFiniteNumber(registered)) {
+    return registered;
+  }
+  if (isFiniteNumber((template as unknown as Record<string, unknown>).expiresAt)) {
+    return (template as unknown as Record<string, unknown>).expiresAt as number;
+  }
+  return DEFAULT_EXPIRES_AT();
+};
+
+const reviveHttpTemplate = (template: unknown): HttpTemplate => {
+  if (!isRecord(template)) {
+    throw new Error('Invalid HTTP template record');
+  }
+  const record = template as Record<string, unknown>;
+  const base = template as unknown as HttpTemplate;
+  return {
+    ...base,
+    created: reviveDate(record.created),
+    lastUsed: record.lastUsed ? reviveDate(record.lastUsed) : undefined,
+  };
+};
+
 const loadHttpTemplates = async (): Promise<HttpTemplate[]> =>
-  readCollection<HttpTemplate>(STORAGE_KEYS.httpTemplates, (item) => ({
-    ...item,
-    created: reviveDate(item.created),
-    lastUsed: item.lastUsed ? reviveDate(item.lastUsed) : undefined,
-  }));
+  readCollection<HttpTemplate>(STORAGE_KEYS.httpTemplates, reviveHttpTemplate);
 
 const httpTemplateService: HttpTemplateService = {
   async list() {
@@ -678,7 +902,7 @@ const httpTemplateService: HttpTemplateService = {
       throw new Error('동일한 ID의 템플릿이 이미 존재합니다.');
     }
     templates.push(template);
-    writeCollection(STORAGE_KEYS.httpTemplates, templates);
+    writeCollection(STORAGE_KEYS.httpTemplates, templates, resolveHttpTemplateExpiresAt);
   },
   async update(template) {
     const templates = await loadHttpTemplates();
@@ -687,11 +911,15 @@ const httpTemplateService: HttpTemplateService = {
       throw new Error('템플릿을 찾을 수 없습니다.');
     }
     templates[index] = template;
-    writeCollection(STORAGE_KEYS.httpTemplates, templates);
+    writeCollection(STORAGE_KEYS.httpTemplates, templates, resolveHttpTemplateExpiresAt);
   },
   async remove(templateId) {
     const templates = await loadHttpTemplates();
-    writeCollection(STORAGE_KEYS.httpTemplates, templates.filter(t => t.id !== templateId));
+    writeCollection(
+      STORAGE_KEYS.httpTemplates,
+      templates.filter(t => t.id !== templateId),
+      resolveHttpTemplateExpiresAt,
+    );
   },
   async useTemplate(templateId, pathParams, queryParams) {
     const templates = await this.list();

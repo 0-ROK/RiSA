@@ -430,7 +430,7 @@ const KeyManagerPage: React.FC = () => {
             type="info"
             showIcon
             message="브라우저에서도 RSA 키를 생성해볼 수 있습니다"
-            description="생성된 키는 이 브라우저의 로컬 스토리지에 저장됩니다. 민감한 데이터를 다룰 때에는 데스크톱 앱 사용을 권장합니다."
+            description="생성된 키는 이 브라우저의 로컬 스토리지에 저장되며 30일이 지나면 자동으로 삭제됩니다. 민감한 데이터를 다룰 때에는 데스크톱 앱 사용을 권장합니다."
             style={{ marginBottom: 16 }}
           />
         )}
