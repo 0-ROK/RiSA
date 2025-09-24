@@ -30,18 +30,47 @@ const services = getPlatformServices();
 const RELEASE_LATEST_URL = 'https://github.com/0-ROK/RiSA/releases/latest';
 const GITHUB_RELEASE_API = 'https://api.github.com/repos/0-ROK/RiSA/releases/latest';
 
-const detectPlatform = (): PlatformInfo => {
+const detectPlatform = async (): Promise<PlatformInfo> => {
   if (typeof navigator === 'undefined') {
     return { os: 'unknown', arch: 'unknown' };
   }
 
   const userAgent = navigator.userAgent.toLowerCase();
-  const platform = navigator.platform.toLowerCase();
+  const platform = (navigator.platform || '').toLowerCase();
+  const uaData: any = (navigator as any).userAgentData;
+
+  const hasTouchCapabilities = typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1;
 
   if (platform.includes('mac') || userAgent.includes('mac')) {
-    const isAppleSilicon = navigator.userAgent.includes('ARM') ||
-      (navigator.platform === 'MacIntel' && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1);
-    return { os: 'macos', arch: isAppleSilicon ? 'arm64' : 'x64' };
+    let arch: PlatformArch = 'x64';
+
+    const lowerUA = userAgent;
+    if (
+      lowerUA.includes('arm64') ||
+      lowerUA.includes('apple silicon')
+    ) {
+      arch = 'arm64';
+    }
+
+    if (navigator.platform === 'MacIntel' && hasTouchCapabilities) {
+      arch = 'arm64';
+    }
+
+    if (uaData?.platform && String(uaData.platform).toLowerCase() === 'macos' && typeof uaData.getHighEntropyValues === 'function') {
+      try {
+        const entropy = await uaData.getHighEntropyValues(['architecture']);
+        const architecture = String(entropy?.architecture || '').toLowerCase();
+        if (architecture.includes('arm')) {
+          arch = 'arm64';
+        } else if (architecture.includes('x86')) {
+          arch = 'x64';
+        }
+      } catch {
+        // Ignore failures and fall back to heuristics
+      }
+    }
+
+    return { os: 'macos', arch };
   }
 
   if (platform.includes('win') || userAgent.includes('windows')) {
@@ -195,12 +224,25 @@ const WebDownloadPrompt: React.FC = () => {
     if (services.environment !== 'web') return;
 
     let cancelled = false;
-    const platformInfo = detectPlatform();
-    setPlatform(platformInfo);
 
-    const fetchLatestRelease = async () => {
+    const initialise = async () => {
       setLoading(true);
       setError(null);
+
+      let platformInfo: PlatformInfo = { os: 'unknown', arch: 'unknown' };
+
+      try {
+        platformInfo = await detectPlatform();
+        if (cancelled) {
+          return;
+        }
+        setPlatform(platformInfo);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        setPlatform({ os: 'unknown', arch: 'unknown' });
+      }
 
       try {
         const response = await fetch(GITHUB_RELEASE_API, {
@@ -214,7 +256,7 @@ const WebDownloadPrompt: React.FC = () => {
         }
 
         const release = await response.json();
-        const assets: GithubAsset[] = Array.isArray(release?.assets)
+        const assets = Array.isArray(release?.assets)
           ? release.assets
             .map((item: GithubAsset) => ({
               name: String(item?.name ?? ''),
@@ -243,7 +285,7 @@ const WebDownloadPrompt: React.FC = () => {
       }
     };
 
-    fetchLatestRelease();
+    initialise();
 
     return () => {
       cancelled = true;
