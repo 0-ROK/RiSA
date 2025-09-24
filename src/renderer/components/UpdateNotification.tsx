@@ -72,7 +72,7 @@ const UpdateNotification: React.FC = () => {
     // === 수동 다운로드 (Fallback) ===
     // 자동 다운로드 실패 시 랜딩 페이지로 이동
     // 랜딩 페이지는 GitHub Pages에서 실제 다운로드 링크를 가져와 표시
-    const repoUrl = 'https://0-rok.github.io/RiSA';
+    const repoUrl = 'https://ri-sa-kklc.vercel.app/#download';
     window.open(repoUrl, '_blank');
     setUpdateAvailable(null);
   };
