@@ -5,49 +5,179 @@ import { getPlatformServices } from '../services';
 
 const { Text } = Typography;
 
-type Platform = 'mac' | 'windows' | 'linux' | 'unknown';
+type PlatformOS = 'macos' | 'windows' | 'linux' | 'unknown';
+type PlatformArch = 'arm64' | 'x64' | 'ia32' | 'unknown';
+
+type PlatformInfo = {
+  os: PlatformOS;
+  arch: PlatformArch;
+};
+
+type GithubAsset = {
+  name: string;
+  browser_download_url: string;
+  size?: number;
+};
+
+type SelectedAsset = {
+  url: string;
+  label: string;
+  size?: number;
+};
 
 const services = getPlatformServices();
 
-const detectPlatform = (): Platform => {
+const RELEASE_LATEST_URL = 'https://github.com/0-ROK/RiSA/releases/latest';
+const GITHUB_RELEASE_API = 'https://api.github.com/repos/0-ROK/RiSA/releases/latest';
+
+const detectPlatform = (): PlatformInfo => {
   if (typeof navigator === 'undefined') {
-    return 'unknown';
+    return { os: 'unknown', arch: 'unknown' };
   }
 
   const userAgent = navigator.userAgent.toLowerCase();
+  const platform = navigator.platform.toLowerCase();
 
-  if (userAgent.includes('macintosh') || userAgent.includes('mac os')) return 'mac';
-  if (userAgent.includes('win')) return 'windows';
-  if (userAgent.includes('linux')) return 'linux';
+  if (platform.includes('mac') || userAgent.includes('mac')) {
+    const isAppleSilicon = navigator.userAgent.includes('ARM') ||
+      (navigator.platform === 'MacIntel' && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1);
+    return { os: 'macos', arch: isAppleSilicon ? 'arm64' : 'x64' };
+  }
 
-  return 'unknown';
+  if (platform.includes('win') || userAgent.includes('windows')) {
+    return { os: 'windows', arch: 'unknown' };
+  }
+
+  if (platform.includes('linux') || userAgent.includes('linux')) {
+    return { os: 'linux', arch: 'unknown' };
+  }
+
+  return { os: 'unknown', arch: 'unknown' };
 };
 
-const getDownloadUrl = (platform: Platform): string => {
-  const base = 'https://ri-sa-kklc.vercel.app';
-  switch (platform) {
-    case 'mac':
-      return `${base}/?platform=macos#download`;
+const formatFileSize = (bytes?: number): string | undefined => {
+  if (!bytes || Number.isNaN(bytes)) {
+    return undefined;
+  }
+
+  if (bytes === 0) return '0 Bytes';
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${sizes[i]}`;
+};
+
+const selectAssetForPlatform = (assets: GithubAsset[], platform: PlatformInfo): SelectedAsset | null => {
+  const normalizedAssets = assets.filter(asset => !asset.name.toLowerCase().includes('blockmap'));
+
+  const findByPredicates = (predicates: Array<(assetName: string) => boolean>): GithubAsset | undefined =>
+    predicates.reduce<GithubAsset | undefined>((found, predicate) => {
+      if (found) return found;
+      return normalizedAssets.find(asset => predicate(asset.name.toLowerCase()));
+    }, undefined);
+
+  const pickMacAsset = (): GithubAsset | undefined => {
+    const isArm = platform.arch === 'arm64';
+    return findByPredicates([
+      (name) => name.includes('mac') && name.includes(isArm ? 'arm64' : 'x64') && name.endsWith('.dmg'),
+      (name) => name.includes('mac') && name.includes(isArm ? 'arm64' : 'x64') && name.endsWith('.zip'),
+      (name) => name.includes('mac') && name.includes(isArm ? 'arm64' : 'x64'),
+      (name) => name.includes('mac') && name.endsWith('.dmg'),
+      (name) => name.includes('mac'),
+    ]);
+  };
+
+  const pickWindowsAsset = (): GithubAsset | undefined =>
+    findByPredicates([
+      (name) => name.includes('win') && name.endsWith('.exe'),
+      (name) => name.includes('windows') && name.endsWith('.exe'),
+      (name) => name.endsWith('.exe'),
+      (name) => name.includes('win'),
+    ]);
+
+  const pickLinuxAsset = (): GithubAsset | undefined =>
+    findByPredicates([
+      (name) => name.endsWith('.appimage'),
+      (name) => name.endsWith('.deb'),
+      (name) => name.includes('linux'),
+    ]);
+
+  let selected: GithubAsset | undefined;
+  let label = '';
+
+  switch (platform.os) {
+    case 'macos':
+      selected = pickMacAsset();
+      label = platform.arch === 'arm64' ? 'macOS (Apple Silicon)' : 'macOS (Intel)';
+      break;
     case 'windows':
-      return `${base}/?platform=windows#download`;
+      selected = pickWindowsAsset();
+      label = 'Windows';
+      break;
     case 'linux':
-      return `${base}/?platform=linux#download`;
+      selected = pickLinuxAsset();
+      label = 'Linux';
+      break;
     default:
-      return `${base}/#download`;
+    // fall through
+  }
+
+  if (selected) {
+    const size = formatFileSize(selected.size);
+    const suffix = size ? ` · ${size}` : '';
+    const extensionMatch = selected.name.split('.').pop();
+    const extensionLabel = extensionMatch ? extensionMatch.toUpperCase() : 'Download';
+    return {
+      url: selected.browser_download_url,
+      label: `${label} ${extensionLabel}${suffix}`.trim(),
+      size: selected.size,
+    };
+  }
+
+  if (normalizedAssets.length > 0) {
+    const fallbackAsset = normalizedAssets[0];
+    const size = formatFileSize(fallbackAsset.size);
+    return {
+      url: fallbackAsset.browser_download_url,
+      label: `${fallbackAsset.name}${size ? ` · ${size}` : ''}`,
+      size: fallbackAsset.size,
+    };
+  }
+
+  return null;
+};
+
+const getPrimaryLabel = (platform: PlatformInfo, hasDirectAsset: boolean, loading: boolean): string => {
+  if (loading) {
+    return '최신 버전 확인 중...';
+  }
+
+  if (!hasDirectAsset) {
+    return 'GitHub 릴리즈 열기';
+  }
+
+  switch (platform.os) {
+    case 'macos':
+      return platform.arch === 'arm64' ? 'macOS (Apple Silicon) 다운로드' : 'macOS (Intel) 다운로드';
+    case 'windows':
+      return 'Windows 다운로드';
+    case 'linux':
+      return 'Linux 다운로드';
+    default:
+      return 'GitHub 릴리즈 열기';
   }
 };
 
-const getPrimaryLabel = (platform: Platform): string => {
-  switch (platform) {
-    case 'mac':
-      return 'macOS 설치 파일 받기';
-    case 'windows':
-      return 'Windows 다운로드 확인';
-    case 'linux':
-      return 'Linux 다운로드 확인';
-    default:
-      return '다운로드 섹션 열기';
+const statusMessage = (loading: boolean, error: string | null, asset: SelectedAsset | null): string => {
+  if (loading) {
+    return '최신 GitHub 릴리즈 정보를 불러오는 중입니다...';
   }
+  if (error) {
+    return '릴리즈 정보를 불러오지 못했습니다. GitHub 릴리즈 페이지에서 직접 파일을 선택하세요.';
+  }
+  if (asset) {
+    return `추천 설치 파일: ${asset.label}`;
+  }
+  return '플랫폼에 맞는 설치 파일을 찾지 못했습니다. GitHub 릴리즈 페이지에서 직접 선택하세요.';
 };
 
 const WebDownloadPrompt: React.FC = () => {
@@ -55,19 +185,83 @@ const WebDownloadPrompt: React.FC = () => {
     return null;
   }
 
-  const [platform, setPlatform] = useState<Platform>('unknown');
+  const [platform, setPlatform] = useState<PlatformInfo>({ os: 'unknown', arch: 'unknown' });
   const [visible, setVisible] = useState<boolean>(true);
+  const [asset, setAsset] = useState<SelectedAsset | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (services.environment !== 'web') return;
-    setPlatform(detectPlatform());
+
+    let cancelled = false;
+    const platformInfo = detectPlatform();
+    setPlatform(platformInfo);
+
+    const fetchLatestRelease = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(GITHUB_RELEASE_API, {
+          headers: {
+            Accept: 'application/vnd.github+json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`GitHub API 요청 실패 (status: ${response.status})`);
+        }
+
+        const release = await response.json();
+        const assets: GithubAsset[] = Array.isArray(release?.assets)
+          ? release.assets
+            .map((item: GithubAsset) => ({
+              name: String(item?.name ?? ''),
+              browser_download_url: String(item?.browser_download_url ?? ''),
+              size: typeof item?.size === 'number' ? item.size : undefined,
+            }))
+            .filter((assetItem: GithubAsset) => assetItem.name && assetItem.browser_download_url)
+          : [];
+
+        if (cancelled) {
+          return;
+        }
+
+        const selected = selectAssetForPlatform(assets, platformInfo);
+        setAsset(selected);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        setAsset(null);
+        setError(err instanceof Error ? err.message : '알 수 없는 오류');
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchLatestRelease();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const downloadUrl = useMemo(() => getDownloadUrl(platform), [platform]);
-  const primaryLabel = useMemo(() => getPrimaryLabel(platform), [platform]);
+  const primaryLabel = useMemo(
+    () => getPrimaryLabel(platform, Boolean(asset), loading),
+    [platform, asset, loading]
+  );
 
   const handleDismiss = () => {
     setVisible(false);
+  };
+
+  const handleDownloadClick = () => {
+    const target = asset?.url ?? RELEASE_LATEST_URL;
+    window.open(target, '_blank', 'noopener,noreferrer');
   };
 
   if (!visible) {
@@ -104,15 +298,18 @@ const WebDownloadPrompt: React.FC = () => {
           <Text type="secondary" style={{ fontSize: 13 }}>
             웹 데모에서는 키 생성과 암·복호화가 제한되므로, 데스크톱 앱을 다운로드해 보세요.
           </Text>
+          <Text type={error ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+            {statusMessage(loading, error, asset)}
+          </Text>
         </div>
 
         <Space size="middle" wrap>
           <Button
             type="primary"
             icon={<DownloadOutlined />}
-            href={downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={handleDownloadClick}
+            loading={loading}
+            disabled={loading && !asset}
           >
             {primaryLabel}
           </Button>
