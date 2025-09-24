@@ -59,14 +59,6 @@ const MainPage: React.FC = () => {
   const [decryptionStatus, setDecryptionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [lastError, setLastError] = useState<string>('');
 
-  const showWebRestrictionNotice = () => {
-    notification.info({
-      message: '웹 데모 제한',
-      description: '웹 데모에서는 RSA 암·복호화 기능을 사용할 수 없습니다. 데스크톱 버전에서 전체 기능을 이용해주세요.',
-      placement: 'topRight',
-    });
-  };
-
   // 선택된 키가 변경될 때마다 selectedKey 업데이트 및 알고리즘 자동 설정
   useEffect(() => {
     const key = keys.find(k => k.id === selectedKeyId);
@@ -79,11 +71,6 @@ const MainPage: React.FC = () => {
   }, [selectedKeyId, keys, selectKey]);
 
   const handleEncrypt = async () => {
-    if (isWebEnvironment) {
-      showWebRestrictionNotice();
-      return;
-    }
-
     if (!encryptText.trim()) {
       message.error('암호화할 텍스트를 입력해주세요.');
       return;
@@ -157,11 +144,6 @@ const MainPage: React.FC = () => {
   };
 
   const handleDecrypt = async () => {
-    if (isWebEnvironment) {
-      showWebRestrictionNotice();
-      return;
-    }
-
     if (!decryptText.trim()) {
       message.error('복호화할 텍스트를 입력해주세요.');
       return;
@@ -512,7 +494,7 @@ const MainPage: React.FC = () => {
   const renderTabBarExtraContent = () => {
     const isEncryptTab = activeTab === 'encrypt';
     const hasInputText = (isEncryptTab ? encryptText : decryptText).trim();
-    const canExecute = !isWebEnvironment && !!selectedKey && !!hasInputText && !loading;
+    const canExecute = !!selectedKey && !!hasInputText && !loading;
 
     return (
       <Space>
@@ -560,8 +542,8 @@ const MainPage: React.FC = () => {
           <Alert
             type="info"
             showIcon
-            message="웹 데모 제한 안내"
-            description="웹 데모에서는 RSA 암·복호화 기능이 비활성화되어 있습니다. 데스크톱 앱에서 전체 기능을 사용하거나 체인 빌더, HTTP 도구 등을 체험해보세요."
+            message="브라우저 환경에서는 로컬에서만 데이터를 처리합니다"
+            description="암·복호화는 이 브라우저에서만 실행되고 키는 로컬 스토리지에 보관되며 30일이 지나면 자동으로 삭제됩니다. 민감한 데이터는 데스크톱 앱에서 처리하는 것을 권장합니다."
             style={{ marginBottom: 16 }}
           />
         )}

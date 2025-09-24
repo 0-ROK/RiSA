@@ -338,7 +338,7 @@ const WebDownloadPrompt: React.FC = () => {
             로컬 앱을 설치하면 모든 RSA 암·복호화 기능을 사용할 수 있어요.
           </Text>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            웹 데모에서는 키 생성과 암·복호화가 제한되므로, 데스크톱 앱을 다운로드해 보세요.
+            브라우저에서도 키 생성과 암·복호화를 체험할 수 있지만, 민감한 데이터는 데스크톱 앱에서 처리하는 것이 더 안전합니다. 로컬에 저장된 데이터는 30일 후 자동으로 정리됩니다.
           </Text>
           <Text type={error ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
             {statusMessage(loading, error, asset)}

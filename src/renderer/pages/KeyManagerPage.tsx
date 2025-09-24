@@ -58,15 +58,6 @@ const KeyManagerPage: React.FC = () => {
   const [selectedEditAlgorithm, setSelectedEditAlgorithm] = useState<'RSA-OAEP' | 'RSA-PKCS1'>('RSA-OAEP');
 
   const handleGenerateKey = async (values: { name: string; keySize: number; preferredAlgorithm: 'RSA-OAEP' | 'RSA-PKCS1' }) => {
-    if (isWebEnvironment) {
-      notification.info({
-        message: '웹 데모 제한',
-        description: '웹 데모에서는 RSA 키 생성을 지원하지 않습니다. 데스크톱 버전에서 키를 생성하거나 직접 등록 기능을 사용해주세요.',
-        placement: 'topRight',
-      });
-      return;
-    }
-
     setGenerateLoading(true);
     try {
       const keyPair = await services.crypto.generateKeyPair(values.keySize);
@@ -86,8 +77,9 @@ const KeyManagerPage: React.FC = () => {
       form.resetFields();
       message.success(`"${values.name}" 키가 생성되었습니다.`);
     } catch (error) {
-      message.error('키 생성 중 오류가 발생했습니다.');
-      console.error(error);
+      const messageText = error instanceof Error ? error.message : '키 생성 중 오류가 발생했습니다.';
+      message.error(messageText);
+      console.error('Key generation failed:', error);
     } finally {
       setGenerateLoading(false);
     }
@@ -399,18 +391,17 @@ const KeyManagerPage: React.FC = () => {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      <PageHeader 
+      <PageHeader
         title="키 관리"
         icon={<KeyOutlined />}
         extra={
           <Space>
-            <Tooltip title={isWebEnvironment ? '웹 데모에서는 키 생성을 지원하지 않습니다.' : undefined}>
+            <Tooltip title={isWebEnvironment ? '브라우저에서도 키를 생성하고 저장할 수 있습니다. 민감한 데이터는 데스크톱 앱에서 처리하는 것을 권장합니다.' : undefined}>
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => setGenerateModalVisible(true)}
                 size="large"
-                disabled={isWebEnvironment}
               >
                 새 키 생성
               </Button>
@@ -438,8 +429,8 @@ const KeyManagerPage: React.FC = () => {
           <Alert
             type="info"
             showIcon
-            message="웹 데모에서는 키 생성이 제한됩니다"
-            description="데스크톱 버전에서 생성한 키를 가져오거나 직접 키를 등록하여 기능을 체험할 수 있습니다."
+            message="브라우저에서도 RSA 키를 생성해볼 수 있습니다"
+            description="생성된 키는 이 브라우저의 로컬 스토리지에 저장되며 30일이 지나면 자동으로 삭제됩니다. 민감한 데이터를 다룰 때에는 데스크톱 앱 사용을 권장합니다."
             style={{ marginBottom: 16 }}
           />
         )}
