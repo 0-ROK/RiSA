@@ -1,26 +1,12 @@
 import { HttpTemplate } from '../../../shared/types';
 import { HttpTemplateService } from '../../../shared/services/types';
 import {
-  DEFAULT_EXPIRES_AT,
   STORAGE_KEYS,
-  getRegisteredExpiration,
-  isFiniteNumber,
   isRecord,
   readCollection,
   reviveDate,
   writeCollection,
 } from './storage/browserStorageCommon';
-
-const resolveHttpTemplateExpiresAt = (template: HttpTemplate): number | undefined => {
-  const registered = getRegisteredExpiration(template);
-  if (isFiniteNumber(registered)) {
-    return registered;
-  }
-  if (isFiniteNumber((template as unknown as Record<string, unknown>).expiresAt)) {
-    return (template as unknown as Record<string, unknown>).expiresAt as number;
-  }
-  return DEFAULT_EXPIRES_AT();
-};
 
 const reviveHttpTemplate = (template: unknown): HttpTemplate => {
   if (!isRecord(template)) {
@@ -49,7 +35,7 @@ export const browserHttpTemplateService: HttpTemplateService = {
       throw new Error('동일한 ID의 템플릿이 이미 존재합니다.');
     }
     templates.push(template);
-    writeCollection(STORAGE_KEYS.httpTemplates, templates, resolveHttpTemplateExpiresAt);
+    writeCollection(STORAGE_KEYS.httpTemplates, templates);
   },
   async update(template) {
     const templates = await loadHttpTemplates();
@@ -58,14 +44,13 @@ export const browserHttpTemplateService: HttpTemplateService = {
       throw new Error('템플릿을 찾을 수 없습니다.');
     }
     templates[index] = template;
-    writeCollection(STORAGE_KEYS.httpTemplates, templates, resolveHttpTemplateExpiresAt);
+    writeCollection(STORAGE_KEYS.httpTemplates, templates);
   },
   async remove(templateId) {
     const templates = await loadHttpTemplates();
     writeCollection(
       STORAGE_KEYS.httpTemplates,
       templates.filter(t => t.id !== templateId),
-      resolveHttpTemplateExpiresAt,
     );
   },
   async useTemplate(templateId, pathParams, queryParams) {

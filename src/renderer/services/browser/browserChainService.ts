@@ -7,10 +7,7 @@ import {
 } from '../../../shared/types';
 import { ChainService } from '../../../shared/services/types';
 import {
-  DEFAULT_EXPIRES_AT,
   STORAGE_KEYS,
-  getRegisteredExpiration,
-  isFiniteNumber,
   isRecord,
   readCollection,
   reviveDate,
@@ -33,17 +30,6 @@ const reviveChainTemplate = (template: unknown): ChainTemplate => {
 };
 
 const chainTemplatesKey = STORAGE_KEYS.chainTemplates;
-
-const resolveTemplateExpiresAt = (template: ChainTemplate): number | undefined => {
-  const registered = getRegisteredExpiration(template);
-  if (isFiniteNumber(registered)) {
-    return registered;
-  }
-  if (isFiniteNumber((template as unknown as Record<string, unknown>).expiresAt)) {
-    return (template as unknown as Record<string, unknown>).expiresAt as number;
-  }
-  return DEFAULT_EXPIRES_AT();
-};
 
 const listTemplates = async (): Promise<ChainTemplate[]> =>
   readCollection(chainTemplatesKey, reviveChainTemplate);
@@ -272,7 +258,7 @@ export const browserChainService: ChainService = {
     } else {
       templates.push(template);
     }
-    writeCollection(chainTemplatesKey, templates, resolveTemplateExpiresAt);
+    writeCollection(chainTemplatesKey, templates);
   },
   async updateTemplate(template) {
     const templates = await listTemplates();
@@ -281,14 +267,13 @@ export const browserChainService: ChainService = {
       throw new Error(`템플릿을 찾을 수 없습니다: ${template.id}`);
     }
     templates[index] = template;
-    writeCollection(chainTemplatesKey, templates, resolveTemplateExpiresAt);
+    writeCollection(chainTemplatesKey, templates);
   },
   async removeTemplate(templateId) {
     const templates = await listTemplates();
     writeCollection(
       chainTemplatesKey,
       templates.filter(t => t.id !== templateId),
-      resolveTemplateExpiresAt,
     );
   },
   async executeChain(steps, inputText, templateId, templateName) {

@@ -1,10 +1,7 @@
 import { HistoryFilter, HistoryItem } from '../../../../shared/types';
 import { HistoryService } from '../../../../shared/services/types';
 import {
-  DATA_EXPIRATION_MS,
   STORAGE_KEYS,
-  getRegisteredExpiration,
-  isFiniteNumber,
   isRecord,
   readCollection,
   reviveDate,
@@ -35,19 +32,6 @@ const matchesFilter = (item: HistoryItem, filter?: HistoryFilter): boolean => {
   return true;
 };
 
-const resolveHistoryExpiresAt = (item: HistoryItem): number | undefined => {
-  const registered = getRegisteredExpiration(item);
-  if (isFiniteNumber(registered)) {
-    return registered;
-  }
-  if (isFiniteNumber((item as unknown as Record<string, unknown>).expiresAt)) {
-    return (item as unknown as Record<string, unknown>).expiresAt as number;
-  }
-  const timestamp = item.timestamp instanceof Date ? item.timestamp : new Date(item.timestamp);
-  const value = timestamp.getTime();
-  return Number.isNaN(value) ? undefined : value + DATA_EXPIRATION_MS;
-};
-
 export const loadHistory = async (): Promise<HistoryItem[]> =>
   readCollection<HistoryItem>(STORAGE_KEYS.history, reviveHistoryItem);
 
@@ -59,14 +43,13 @@ export const browserHistoryService: HistoryService = {
   async save(item) {
     const history = await loadHistory();
     history.unshift(item);
-    writeCollection(STORAGE_KEYS.history, history, resolveHistoryExpiresAt);
+    writeCollection(STORAGE_KEYS.history, history);
   },
   async remove(historyId) {
     const history = await loadHistory();
     writeCollection(
       STORAGE_KEYS.history,
       history.filter(item => item.id !== historyId),
-      resolveHistoryExpiresAt,
     );
   },
   async clear() {

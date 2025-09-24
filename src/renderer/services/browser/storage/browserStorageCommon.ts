@@ -34,144 +34,55 @@ export const STORAGE_KEYS = {
   httpTemplates: 'risa.httpTemplates',
 } as const;
 
-export const DATA_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-export const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
-type StoredItem<T> = {
-  value: T;
-  expiresAt: number;
-};
-
-export const DEFAULT_EXPIRES_AT = () => Date.now() + DATA_EXPIRATION_MS;
-
-const expirationRegistry = new WeakMap<object, number>();
-
-export const registerExpiration = (value: unknown, expiresAt: number): void => {
-  if (isRecord(value)) {
-    expirationRegistry.set(value as object, expiresAt);
-  }
-};
-
-export const getRegisteredExpiration = (value: unknown): number | undefined => {
-  if (isRecord(value)) {
-    return expirationRegistry.get(value as object);
-  }
-  return undefined;
-};
-
-const writeStoredItems = <T>(key: string, items: StoredItem<T>[]): void => {
-  getStorage().setItem(key, JSON.stringify(items));
-};
-
-export const writeCollection = <T>(
-  key: string,
-  value: T[],
-  getExpiresAt: (item: T) => number | undefined = () => DEFAULT_EXPIRES_AT(),
-): void => {
-  const storedItems: StoredItem<T>[] = [];
-
-  value.forEach(item => {
-    const expiresAt = getExpiresAt(item);
-    if (!isFiniteNumber(expiresAt)) {
-      return;
-    }
+const sanitizeItems = <T>(items: T[]): T[] =>
+  items.map(item => {
     if (isRecord(item)) {
-      (item as Record<string, unknown>).expiresAt = expiresAt;
+      const clone = { ...item } as Record<string, unknown>;
+      delete clone.expiresAt;
+      return clone as unknown as T;
     }
-    registerExpiration(item, expiresAt);
-    storedItems.push({ value: item, expiresAt });
+    return item;
   });
 
-  writeStoredItems(key, storedItems);
-};
-
-interface ParsedEntry<T> {
-  item: StoredItem<T>;
-  needsMigration: boolean;
-}
-
-const parseStoredEntry = <T>(
-  entry: unknown,
-  revive: ((raw: unknown) => T) | undefined,
-  now: number,
-): ParsedEntry<T> | null => {
-  let rawValue: unknown;
-  let expiresAt: number | undefined;
-  let needsMigration = false;
-
-  if (isRecord(entry) && 'value' in entry) {
-    const record = entry as Record<string, unknown>;
-    rawValue = record.value;
-
-    if (isFiniteNumber(record.expiresAt)) {
-      expiresAt = record.expiresAt;
-    } else if (isFiniteNumber(record.createdAt)) {
-      expiresAt = record.createdAt + DATA_EXPIRATION_MS;
-      needsMigration = true;
-    } else {
-      needsMigration = true;
-    }
-  } else {
-    rawValue = entry;
-    needsMigration = true;
-  }
-
-  let value: T;
-  try {
-    value = revive ? revive(rawValue) : (rawValue as T);
-  } catch {
-    return null;
-  }
-
-  if (!isFiniteNumber(expiresAt) || expiresAt < now) {
-    return null;
-  }
-
-  if (isRecord(value)) {
-    (value as Record<string, unknown>).expiresAt = expiresAt;
-  }
-  return {
-    item: { value, expiresAt },
-    needsMigration,
-  };
+export const writeCollection = <T>(key: string, value: T[]): void => {
+  const sanitized = sanitizeItems(value);
+  getStorage().setItem(key, JSON.stringify(sanitized));
 };
 
 export const readCollection = <T>(key: string, revive?: (raw: unknown) => T): T[] => {
   try {
     const raw = getStorage().getItem(key);
     if (!raw) return [];
+
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    const now = Date.now();
-    const migratedItems: StoredItem<T>[] = [];
     const result: T[] = [];
     let requiresRewrite = false;
 
-    const entries: unknown[] = parsed;
-    entries.forEach(entry => {
-      const parsedEntry = parseStoredEntry(entry, revive, now);
-      if (!parsedEntry) {
+    parsed.forEach(entry => {
+      let rawValue = entry;
+      if (isRecord(entry) && 'value' in entry) {
+        rawValue = (entry as Record<string, unknown>).value;
         requiresRewrite = true;
-        return;
       }
 
-      const { item, needsMigration } = parsedEntry;
-      migratedItems.push(item);
-      result.push(item.value);
-      registerExpiration(item.value, item.expiresAt);
-      if (needsMigration) {
+      try {
+        const value = revive ? revive(rawValue) : (rawValue as T);
+        if (isRecord(value)) {
+          delete (value as Record<string, unknown>).expiresAt;
+        }
+        result.push(value);
+      } catch {
         requiresRewrite = true;
       }
     });
 
     if (requiresRewrite) {
-      writeStoredItems(key, migratedItems);
+      writeCollection(key, result);
     }
 
     return result;
