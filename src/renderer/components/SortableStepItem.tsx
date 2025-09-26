@@ -78,6 +78,20 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
   const handleTemplateSelect = (templateId: string) => {
     const template = httpTemplates.find(t => t.id === templateId);
     if (template) {
+      // Seed default mappings so execution can rely on explicit entries
+      const pathParams = extractPathParams(template.pathTemplate);
+      const queryParams = extractQueryParams(template.queryTemplate);
+
+      const defaultParamMappings = pathParams.reduce<Record<string, { type: 'auto' | 'fixed' | 'skip'; value?: string }>>((acc, param) => {
+        acc[param] = step.params?.paramMappings?.[param] ?? { type: 'auto' };
+        return acc;
+      }, {});
+
+      const defaultQueryMappings = queryParams.reduce<Record<string, { type: 'auto' | 'fixed' | 'skip'; value?: string }>>((acc, param) => {
+        acc[param] = step.params?.queryMappings?.[param] ?? { type: 'auto' };
+        return acc;
+      }, {});
+
       onUpdateStep(step.id, {
         params: {
           ...step.params,
@@ -85,6 +99,8 @@ export const SortableStepItem: React.FC<SortableStepItemProps> = ({
           baseUrl: template.baseUrl,
           pathTemplate: template.pathTemplate,
           queryTemplate: template.queryTemplate,
+          paramMappings: defaultParamMappings,
+          queryMappings: defaultQueryMappings,
           // 출력 타입 초기화
           outputType: step.params?.outputType || 'full',
         }
