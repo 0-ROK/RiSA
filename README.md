@@ -29,7 +29,7 @@ RiSA는 암·복호화를 간단하게 만들면서도 키 값을 네트워크�
 
 ### 💻 RiSA Web
 
-**[https://ri-sa-kklc.vercel.app/](https://ri-sa-kklc.vercel.app/)**
+**[https://ri-sa.vercel.app/](https://ri-sa.vercel.app/)**
 
 브라우저에서 주요 기능을 즉시 체험하고, 필요한 경우 화면 하단에 나타나는 다운로드 팝업에서 운영체제에 맞는 설치 파일을 바로 받을 수 있습니다.
 _현재 MacOS 버전으로만 제공됩니다._
